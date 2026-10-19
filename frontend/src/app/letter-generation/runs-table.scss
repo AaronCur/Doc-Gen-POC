@@ -1,0 +1,74 @@
+@use '@angular/material' as mat;
+
+// Layout
+.generation {
+  width: 220px;
+  white-space: nowrap;
+}
+
+.generation-text {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.action {
+  text-align: right;
+}
+
+.hint {
+  margin-top: 4px;
+}
+
+.empty {
+  padding: 16px;
+}
+
+// Text styles, from the theme's typography and colour roles
+.letter-type,
+.status {
+  font-weight: 500;
+}
+
+.secondary {
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+}
+
+.status {
+  color: var(--mat-sys-primary);
+
+  &.complete {
+    color: var(--mat-sys-tertiary);
+  }
+
+  &.needs-attention {
+    color: var(--mat-sys-error);
+  }
+}
+
+mat-progress-bar.complete {
+  @include mat.progress-bar-overrides((
+    active-indicator-color: var(--mat-sys-tertiary),
+  ));
+}
+
+// The two visibility chip colours, from the theme palette.
+.chip-staff {
+  @include mat.chips-overrides((
+    outline-color: transparent,
+    elevated-container-color: var(--mat-sys-surface-container-high),
+    label-text-color: var(--mat-sys-on-surface-variant),
+    with-avatar-avatar-size: 18px,
+  ));
+}
+
+.chip-external {
+  @include mat.chips-overrides((
+    outline-color: transparent,
+    elevated-container-color: var(--mat-sys-tertiary-container),
+    label-text-color: var(--mat-sys-on-tertiary-container),
+    with-avatar-avatar-size: 18px,
+  ));
+}

@@ -1,0 +1,48 @@
+<mat-card>
+  <mat-card-header>
+    <mat-card-title>Generate letters</mat-card-title>
+  </mat-card-header>
+
+  <mat-card-content>
+    <p class="description">
+      Queues a letter of the selected type for every eligible application that doesn't already have one. New
+      letters are visible to staff only until enabled for external users.
+    </p>
+    <form class="fields" [formGroup]="form" (ngSubmit)="openConfirmation()">
+      <mat-form-field appearance="outline">
+        <mat-label>Letter type</mat-label>
+        <mat-select formControlName="letterType" required>
+          @for (type of letterTypes(); track type.code) {
+            <mat-option [value]="type.code">{{ type.name }}</mat-option>
+          }
+        </mat-select>
+        @if (form.controls.letterType.hasError('runActive')) {
+          <mat-error>A run for this letter type is still generating. Wait for it to complete.</mat-error>
+        } @else if (form.controls.letterType.hasError('noEligible')) {
+          <mat-error>No new applications are awaiting this letter type.</mat-error>
+        } @else if (form.controls.letterType.hasError('required')) {
+          <mat-error>Select a letter type.</mat-error>
+        } @else if (hasPreviousRuns()) {
+          <mat-hint>Previous runs exist for this type. Only applications without a letter of this type will be included.</mat-hint>
+        }
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Claim submitted date</mat-label>
+        <input matInput [matDatepicker]="picker" formControlName="claimSubmittedDate" required />
+        <mat-datepicker-toggle matIconSuffix [for]="picker" />
+        <mat-datepicker #picker />
+        <mat-hint>Recorded against each application in this run.</mat-hint>
+        @if (form.controls.claimSubmittedDate.hasError('matDatepickerParse')) {
+          <mat-error>Enter a valid date.</mat-error>
+        } @else if (form.controls.claimSubmittedDate.hasError('required')) {
+          <mat-error>Enter the claim submitted date.</mat-error>
+        }
+      </mat-form-field>
+
+      <div class="actions">
+        <button mat-flat-button type="submit" [disabled]="!canGenerate()">Generate</button>
+      </div>
+    </form>
+  </mat-card-content>
+</mat-card>

@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: case-service
+  flyway:
+    # Schema migrations only. Demo data is added by the dev profile.
+    locations: classpath:db/migration
+  jpa:
+    hibernate:
+      # Flyway owns the schema; Hibernate only checks the entities match it.
+      ddl-auto: validate
+    # Entities never leave the service layer, so no session is kept open for rendering.
+    open-in-view: false
+    properties:
+      hibernate:
+        # Map java.time.Instant to the plain TIMESTAMP columns in the migrations.
+        type:
+          preferred_instant_jdbc_type: TIMESTAMP
+  mvc:
+    apiversion:
+      supported: 1
+      default: 1
+      use:
+        header: Api-Version
+
+# Stuck detection: a run with no new letters for stuck-cycles x generator-interval
+# moves to NEEDS_ATTENTION. generator-interval must match the real letter-generator's schedule.
+letters:
+  stuck-cycles: 3
+  generator-interval: 10s
+  stuck-check-interval: 1m
+
+# OpenAPI document and Swagger UI: off unless a profile turns them on (dev does).
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

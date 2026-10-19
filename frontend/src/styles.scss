@@ -1,0 +1,47 @@
+@use 'sass:map';
+@use '@angular/material' as mat;
+// Generated with `ng generate @angular/material:theme-color` from the UX mockup's colours:
+// primary #1F4E79 (brand blue), tertiary #2E7D3E (green, used for "released" and "complete").
+@use './theme-colors' as theme-colors;
+
+html {
+  height: 100%;
+  @include mat.theme(
+    (
+      color: (
+        primary: theme-colors.$primary-palette,
+        tertiary: theme-colors.$tertiary-palette,
+      ),
+      typography: Roboto,
+      density: 0,
+    )
+  );
+
+  // Cards are white on the light grey page, as in the mockup.
+  @include mat.card-overrides(
+    (
+      elevated-container-color: var(--mat-sys-surface-container-lowest),
+    )
+  );
+
+  // Tables and paginators sit inside cards, so they take the card's background.
+  @include mat.table-overrides((background-color: transparent));
+  @include mat.paginator-overrides((container-background-color: transparent));
+
+  // Header bar in the brand colour (primary tone 30 is the mockup's #1F4E79).
+  @include mat.toolbar-overrides(
+    (
+      container-background-color: map.get(theme-colors.$primary-palette, 30),
+      container-text-color: map.get(theme-colors.$primary-palette, 100),
+    )
+  );
+}
+
+body {
+  color-scheme: light;
+  background-color: var(--mat-sys-surface-container-low);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+  margin: 0;
+  height: 100%;
+}

@@ -1,0 +1,21 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.runs-header {
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.refresh-note {
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+}

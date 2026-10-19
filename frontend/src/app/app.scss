@@ -1,0 +1,41 @@
+@use '@angular/material' as mat;
+
+mat-toolbar {
+  gap: 12px;
+}
+
+.title {
+  font: var(--mat-sys-title-large);
+}
+
+.spacer {
+  flex: 1;
+}
+
+// Role pill on the brand-coloured toolbar.
+.role-chip {
+  @include mat.chips-overrides((
+    outline-color: transparent,
+    elevated-container-color: color-mix(in srgb, currentColor 16%, transparent),
+    label-text-color: var(--mat-toolbar-container-text-color),
+  ));
+}
+
+.poc-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 24px 0;
+}
+
+.user-switcher {
+  width: 200px;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px 16px 48px;
+}

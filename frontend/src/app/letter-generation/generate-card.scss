@@ -1,0 +1,16 @@
+.fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+  padding-top: 8px;
+}
+
+.actions {
+  padding-top: 8px;
+}
+
+.description {
+  margin: 4px 0 0;
+  color: var(--mat-sys-on-surface-variant);
+}

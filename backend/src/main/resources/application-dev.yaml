@@ -1,0 +1,22 @@
+# DEV PROFILE ONLY: demo data, in-memory database, simulated generator, Swagger UI.
+spring:
+  datasource:
+    # Fixed name so the H2 console can connect to the same in-memory database.
+    url: jdbc:h2:mem:letters;DB_CLOSE_DELAY=-1
+  flyway:
+    locations: classpath:db/migration,classpath:db/seed-dev
+
+# Simulated letter-generator (NOT part of case-service; see the simulatedgenerator package)
+simulated-generator:
+  interval: 10s
+  batch-size: 5
+  failing-app-ids: APP-0043
+
+# OpenAPI document at /v3/api-docs, Swagger UI at /swagger-ui/index.html
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+    tags-sorter: alpha
+    operations-sorter: method

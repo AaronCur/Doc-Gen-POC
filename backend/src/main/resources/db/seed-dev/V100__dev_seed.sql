@@ -1,0 +1,221 @@
+-- DEV PROFILE ONLY. Demo data for the letter generation walkthrough.
+-- Loaded via spring.flyway.locations in application-dev.properties.
+
+-- 60 applications: APP-0001 .. APP-0060
+INSERT INTO case_applications (app_id, status) VALUES
+  ('APP-0001', 'SUBMITTED'),
+  ('APP-0002', 'SUBMITTED'),
+  ('APP-0003', 'SUBMITTED'),
+  ('APP-0004', 'SUBMITTED'),
+  ('APP-0005', 'SUBMITTED'),
+  ('APP-0006', 'SUBMITTED'),
+  ('APP-0007', 'SUBMITTED'),
+  ('APP-0008', 'SUBMITTED'),
+  ('APP-0009', 'SUBMITTED'),
+  ('APP-0010', 'SUBMITTED'),
+  ('APP-0011', 'SUBMITTED'),
+  ('APP-0012', 'SUBMITTED'),
+  ('APP-0013', 'SUBMITTED'),
+  ('APP-0014', 'SUBMITTED'),
+  ('APP-0015', 'SUBMITTED'),
+  ('APP-0016', 'SUBMITTED'),
+  ('APP-0017', 'SUBMITTED'),
+  ('APP-0018', 'SUBMITTED'),
+  ('APP-0019', 'SUBMITTED'),
+  ('APP-0020', 'SUBMITTED'),
+  ('APP-0021', 'SUBMITTED'),
+  ('APP-0022', 'SUBMITTED'),
+  ('APP-0023', 'SUBMITTED'),
+  ('APP-0024', 'SUBMITTED'),
+  ('APP-0025', 'SUBMITTED'),
+  ('APP-0026', 'SUBMITTED'),
+  ('APP-0027', 'SUBMITTED'),
+  ('APP-0028', 'SUBMITTED'),
+  ('APP-0029', 'SUBMITTED'),
+  ('APP-0030', 'SUBMITTED'),
+  ('APP-0031', 'SUBMITTED'),
+  ('APP-0032', 'SUBMITTED'),
+  ('APP-0033', 'SUBMITTED'),
+  ('APP-0034', 'SUBMITTED'),
+  ('APP-0035', 'SUBMITTED'),
+  ('APP-0036', 'SUBMITTED'),
+  ('APP-0037', 'SUBMITTED'),
+  ('APP-0038', 'SUBMITTED'),
+  ('APP-0039', 'SUBMITTED'),
+  ('APP-0040', 'SUBMITTED'),
+  ('APP-0041', 'SUBMITTED'),
+  ('APP-0042', 'SUBMITTED'),
+  ('APP-0043', 'SUBMITTED'),
+  ('APP-0044', 'SUBMITTED'),
+  ('APP-0045', 'SUBMITTED'),
+  ('APP-0046', 'SUBMITTED'),
+  ('APP-0047', 'SUBMITTED'),
+  ('APP-0048', 'SUBMITTED'),
+  ('APP-0049', 'SUBMITTED'),
+  ('APP-0050', 'SUBMITTED'),
+  ('APP-0051', 'SUBMITTED'),
+  ('APP-0052', 'SUBMITTED'),
+  ('APP-0053', 'SUBMITTED'),
+  ('APP-0054', 'SUBMITTED'),
+  ('APP-0055', 'SUBMITTED'),
+  ('APP-0056', 'SUBMITTED'),
+  ('APP-0057', 'SUBMITTED'),
+  ('APP-0058', 'SUBMITTED'),
+  ('APP-0059', 'SUBMITTED'),
+  ('APP-0060', 'SUBMITTED');
+
+-- Eligibility per letter type. LETTER_F and LETTER_G have no eligible applications.
+-- LETTER_A: apps 1-20; APP-0001 and APP-0002 already have a letter, so 18 eligible
+INSERT INTO application_letter_eligibility (app_id, letter_type) VALUES
+  ('APP-0001', 'LETTER_A'),
+  ('APP-0002', 'LETTER_A'),
+  ('APP-0003', 'LETTER_A'),
+  ('APP-0004', 'LETTER_A'),
+  ('APP-0005', 'LETTER_A'),
+  ('APP-0006', 'LETTER_A'),
+  ('APP-0007', 'LETTER_A'),
+  ('APP-0008', 'LETTER_A'),
+  ('APP-0009', 'LETTER_A'),
+  ('APP-0010', 'LETTER_A'),
+  ('APP-0011', 'LETTER_A'),
+  ('APP-0012', 'LETTER_A'),
+  ('APP-0013', 'LETTER_A'),
+  ('APP-0014', 'LETTER_A'),
+  ('APP-0015', 'LETTER_A'),
+  ('APP-0016', 'LETTER_A'),
+  ('APP-0017', 'LETTER_A'),
+  ('APP-0018', 'LETTER_A'),
+  ('APP-0019', 'LETTER_A'),
+  ('APP-0020', 'LETTER_A');
+
+-- LETTER_B: apps 11-35; 25 eligible
+INSERT INTO application_letter_eligibility (app_id, letter_type) VALUES
+  ('APP-0011', 'LETTER_B'),
+  ('APP-0012', 'LETTER_B'),
+  ('APP-0013', 'LETTER_B'),
+  ('APP-0014', 'LETTER_B'),
+  ('APP-0015', 'LETTER_B'),
+  ('APP-0016', 'LETTER_B'),
+  ('APP-0017', 'LETTER_B'),
+  ('APP-0018', 'LETTER_B'),
+  ('APP-0019', 'LETTER_B'),
+  ('APP-0020', 'LETTER_B'),
+  ('APP-0021', 'LETTER_B'),
+  ('APP-0022', 'LETTER_B'),
+  ('APP-0023', 'LETTER_B'),
+  ('APP-0024', 'LETTER_B'),
+  ('APP-0025', 'LETTER_B'),
+  ('APP-0026', 'LETTER_B'),
+  ('APP-0027', 'LETTER_B'),
+  ('APP-0028', 'LETTER_B'),
+  ('APP-0029', 'LETTER_B'),
+  ('APP-0030', 'LETTER_B'),
+  ('APP-0031', 'LETTER_B'),
+  ('APP-0032', 'LETTER_B'),
+  ('APP-0033', 'LETTER_B'),
+  ('APP-0034', 'LETTER_B'),
+  ('APP-0035', 'LETTER_B');
+
+-- LETTER_C: apps 30-60; APP-0030 already has a letter, so 30 eligible
+INSERT INTO application_letter_eligibility (app_id, letter_type) VALUES
+  ('APP-0030', 'LETTER_C'),
+  ('APP-0031', 'LETTER_C'),
+  ('APP-0032', 'LETTER_C'),
+  ('APP-0033', 'LETTER_C'),
+  ('APP-0034', 'LETTER_C'),
+  ('APP-0035', 'LETTER_C'),
+  ('APP-0036', 'LETTER_C'),
+  ('APP-0037', 'LETTER_C'),
+  ('APP-0038', 'LETTER_C'),
+  ('APP-0039', 'LETTER_C'),
+  ('APP-0040', 'LETTER_C'),
+  ('APP-0041', 'LETTER_C'),
+  ('APP-0042', 'LETTER_C'),
+  ('APP-0043', 'LETTER_C'),
+  ('APP-0044', 'LETTER_C'),
+  ('APP-0045', 'LETTER_C'),
+  ('APP-0046', 'LETTER_C'),
+  ('APP-0047', 'LETTER_C'),
+  ('APP-0048', 'LETTER_C'),
+  ('APP-0049', 'LETTER_C'),
+  ('APP-0050', 'LETTER_C'),
+  ('APP-0051', 'LETTER_C'),
+  ('APP-0052', 'LETTER_C'),
+  ('APP-0053', 'LETTER_C'),
+  ('APP-0054', 'LETTER_C'),
+  ('APP-0055', 'LETTER_C'),
+  ('APP-0056', 'LETTER_C'),
+  ('APP-0057', 'LETTER_C'),
+  ('APP-0058', 'LETTER_C'),
+  ('APP-0059', 'LETTER_C'),
+  ('APP-0060', 'LETTER_C');
+
+-- LETTER_D: every third app; 20 eligible
+INSERT INTO application_letter_eligibility (app_id, letter_type) VALUES
+  ('APP-0003', 'LETTER_D'),
+  ('APP-0006', 'LETTER_D'),
+  ('APP-0009', 'LETTER_D'),
+  ('APP-0012', 'LETTER_D'),
+  ('APP-0015', 'LETTER_D'),
+  ('APP-0018', 'LETTER_D'),
+  ('APP-0021', 'LETTER_D'),
+  ('APP-0024', 'LETTER_D'),
+  ('APP-0027', 'LETTER_D'),
+  ('APP-0030', 'LETTER_D'),
+  ('APP-0033', 'LETTER_D'),
+  ('APP-0036', 'LETTER_D'),
+  ('APP-0039', 'LETTER_D'),
+  ('APP-0042', 'LETTER_D'),
+  ('APP-0045', 'LETTER_D'),
+  ('APP-0048', 'LETTER_D'),
+  ('APP-0051', 'LETTER_D'),
+  ('APP-0054', 'LETTER_D'),
+  ('APP-0057', 'LETTER_D'),
+  ('APP-0060', 'LETTER_D');
+
+-- LETTER_E: apps 41-45; APP-0043 always fails in the simulated generator (stuck demo)
+INSERT INTO application_letter_eligibility (app_id, letter_type) VALUES
+  ('APP-0041', 'LETTER_E'),
+  ('APP-0042', 'LETTER_E'),
+  ('APP-0043', 'LETTER_E'),
+  ('APP-0044', 'LETTER_E'),
+  ('APP-0045', 'LETTER_E');
+
+-- LETTER_H: apps 50-60; 11 eligible
+INSERT INTO application_letter_eligibility (app_id, letter_type) VALUES
+  ('APP-0050', 'LETTER_H'),
+  ('APP-0051', 'LETTER_H'),
+  ('APP-0052', 'LETTER_H'),
+  ('APP-0053', 'LETTER_H'),
+  ('APP-0054', 'LETTER_H'),
+  ('APP-0055', 'LETTER_H'),
+  ('APP-0056', 'LETTER_H'),
+  ('APP-0057', 'LETTER_H'),
+  ('APP-0058', 'LETTER_H'),
+  ('APP-0059', 'LETTER_H'),
+  ('APP-0060', 'LETTER_H');
+
+-- LETTER_I: apps 1-3, all of which already have a letter, so 0 eligible
+INSERT INTO application_letter_eligibility (app_id, letter_type) VALUES
+  ('APP-0001', 'LETTER_I'),
+  ('APP-0002', 'LETTER_I'),
+  ('APP-0003', 'LETTER_I');
+
+-- Existing letters produced by the old datafix route. They have NO run item,
+-- so they stay visible to external users exactly as today. Their queue rows
+-- were already processed (flag Y).
+INSERT INTO case_documents (doc_id, app_id, document_type, created_at) VALUES
+  ('DOC-EXISTING-1', 'APP-0001', 'LETTER_A', TIMESTAMP '2026-01-15 09:00:00'),
+  ('DOC-EXISTING-2', 'APP-0002', 'LETTER_A', TIMESTAMP '2026-01-15 09:00:00'),
+  ('DOC-EXISTING-3', 'APP-0030', 'LETTER_C', TIMESTAMP '2026-01-15 09:00:00'),
+  ('DOC-EXISTING-4', 'APP-0001', 'LETTER_I', TIMESTAMP '2026-01-15 09:00:00'),
+  ('DOC-EXISTING-5', 'APP-0002', 'LETTER_I', TIMESTAMP '2026-01-15 09:00:00'),
+  ('DOC-EXISTING-6', 'APP-0003', 'LETTER_I', TIMESTAMP '2026-01-15 09:00:00');
+
+INSERT INTO letter_request_queue (queue_key, letter_type, generated_flag) VALUES
+  ('APP-0001_LETTER_A', 'LETTER_A', 'Y'),
+  ('APP-0002_LETTER_A', 'LETTER_A', 'Y'),
+  ('APP-0030_LETTER_C', 'LETTER_C', 'Y'),
+  ('APP-0001_LETTER_I', 'LETTER_I', 'Y'),
+  ('APP-0002_LETTER_I', 'LETTER_I', 'Y'),
+  ('APP-0003_LETTER_I', 'LETTER_I', 'Y');

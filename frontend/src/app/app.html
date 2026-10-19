@@ -1,0 +1,25 @@
+<mat-toolbar>
+  <mat-icon aria-hidden="true">mail</mat-icon>
+  <span class="title">Letter generation</span>
+  <span class="spacer"></span>
+  <span>Signed in as {{ devUser.name() }}</span>
+  <mat-chip-set aria-label="Your role">
+    <mat-chip class="role-chip">{{ devUser.roleLabel() }}</mat-chip>
+  </mat-chip-set>
+</mat-toolbar>
+
+<!-- POC ONLY: stands in for signing in through the real identity provider. -->
+<div class="poc-bar" role="region" aria-label="POC user switcher">
+  <mat-form-field subscriptSizing="dynamic" class="user-switcher">
+    <mat-label>POC only: act as</mat-label>
+    <mat-select [value]="devUser.name()" (valueChange)="switchUser($event)">
+      @for (name of devUser.names; track name) {
+        <mat-option [value]="name">{{ name }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+</div>
+
+<main class="content">
+  <router-outlet />
+</main>

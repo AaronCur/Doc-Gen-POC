@@ -1,0 +1,33 @@
+@if (devUser.isAdmin()) {
+  <app-generate-card
+    [letterTypes]="letterTypes()"
+    [activeLetterTypes]="activeLetterTypes()"
+    [letterTypesWithRuns]="letterTypesWithRuns()"
+    (generated)="onGenerated()"
+  />
+} @else {
+  <mat-card appearance="filled" role="note">
+    <mat-card-content class="banner">
+      <mat-icon aria-hidden="true">info</mat-icon>
+      <span>Generating letters is restricted to the Admin role. You can enable generated letters for external users.</span>
+    </mat-card-content>
+  </mat-card>
+}
+
+<mat-card>
+  <mat-card-header class="runs-header">
+    <mat-card-title>Letter generation runs</mat-card-title>
+    <span class="refresh-note">Progress refreshes automatically</span>
+  </mat-card-header>
+  <mat-card-content>
+    <app-runs-table
+      [runs]="runs()"
+      [total]="total()"
+      [pageIndex]="pageIndex()"
+      [pageSize]="pageSize()"
+      [canEnable]="devUser.isStaff()"
+      (pageChange)="onPage($event)"
+      (enable)="confirmEnable($event)"
+    />
+  </mat-card-content>
+</mat-card>

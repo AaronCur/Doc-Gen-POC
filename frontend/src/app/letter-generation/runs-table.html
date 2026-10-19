@@ -1,0 +1,101 @@
+<table mat-table [dataSource]="runs()" aria-label="Letter generation runs">
+  <ng-container matColumnDef="letterType">
+    <th mat-header-cell *matHeaderCellDef>Letter type</th>
+    <td mat-cell *matCellDef="let run" class="letter-type">{{ run.letterTypeName }}</td>
+  </ng-container>
+
+  <ng-container matColumnDef="claimSubmittedDate">
+    <th mat-header-cell *matHeaderCellDef>Claim submitted date</th>
+    <td mat-cell *matCellDef="let run">{{ run.claimSubmittedDate | date: 'dd/MM/yyyy' }}</td>
+  </ng-container>
+
+  <ng-container matColumnDef="requested">
+    <th mat-header-cell *matHeaderCellDef>Requested</th>
+    <td mat-cell *matCellDef="let run">
+      <div>{{ run.requestedAt | date: 'dd MMM yyyy, HH:mm' }}</div>
+      <div class="secondary">by {{ run.requestedBy }}</div>
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="generation">
+    <th mat-header-cell *matHeaderCellDef class="generation">Generation</th>
+    <td mat-cell *matCellDef="let run" class="generation">
+      <mat-progress-bar
+        mode="determinate"
+        [class.complete]="run.status === 'COMPLETE'"
+        [value]="percent(run)"
+        [attr.aria-label]="'Letters generated for ' + run.letterTypeName + ': ' + run.generatedCount + ' of ' + run.totalCount"
+      />
+      <div class="generation-text">
+        <span>{{ run.generatedCount }} / {{ run.totalCount }} letters</span>
+        <span
+          class="status"
+          [class.complete]="run.status === 'COMPLETE'"
+          [class.needs-attention]="run.status === 'NEEDS_ATTENTION'"
+          >{{ statusLabel(run) }}</span
+        >
+      </div>
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="visibility">
+    <th mat-header-cell *matHeaderCellDef>Visibility</th>
+    <td mat-cell *matCellDef="let run">
+      <mat-chip-set [attr.aria-label]="'Visibility of ' + run.letterTypeName + ' run'">
+        @if (run.visibility === 'STAFF_AND_EXTERNAL') {
+          <mat-chip class="chip-external">
+            <mat-icon matChipAvatar aria-hidden="true">check</mat-icon>
+            Staff + External
+          </mat-chip>
+        } @else {
+          <mat-chip class="chip-staff">
+            <mat-icon matChipAvatar aria-hidden="true">lock</mat-icon>
+            Staff only
+          </mat-chip>
+        }
+      </mat-chip-set>
+      @if (run.releasedAt) {
+        <div class="secondary">Enabled {{ run.releasedAt | date: 'dd MMM yyyy' }} by {{ run.releasedBy }}</div>
+      }
+    </td>
+  </ng-container>
+
+  <ng-container matColumnDef="action">
+    <th mat-header-cell *matHeaderCellDef class="action">Action</th>
+    <td mat-cell *matCellDef="let run" class="action">
+      @if (run.visibility === 'STAFF_AND_EXTERNAL') {
+        <span class="secondary" aria-label="No action">—</span>
+      } @else if (canEnable()) {
+        <button
+          mat-stroked-button
+          type="button"
+          [disabled]="!isEnableable(run)"
+          (click)="enable.emit(run)"
+          [attr.aria-describedby]="isEnableable(run) ? null : 'enable-hint-' + run.runId"
+        >
+          Enable for external users
+        </button>
+        @if (run.status === 'NEEDS_ATTENTION') {
+          <div class="secondary hint" [id]="'enable-hint-' + run.runId">Generation stalled; contact support</div>
+        } @else if (run.status === 'GENERATING') {
+          <div class="secondary hint" [id]="'enable-hint-' + run.runId">Available when generation completes</div>
+        }
+      }
+    </td>
+  </ng-container>
+
+  <tr mat-header-row *matHeaderRowDef="columns"></tr>
+  <tr mat-row *matRowDef="let row; columns: columns"></tr>
+  <tr class="mat-mdc-row" *matNoDataRow>
+    <td class="mat-mdc-cell empty" [attr.colspan]="columns.length">No letter generation runs yet.</td>
+  </tr>
+</table>
+
+<mat-paginator
+  [length]="total()"
+  [pageIndex]="pageIndex()"
+  [pageSize]="pageSize()"
+  [pageSizeOptions]="[10, 20, 50]"
+  (page)="pageChange.emit($event)"
+  aria-label="Select page of runs"
+/>
