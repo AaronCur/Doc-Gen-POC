@@ -176,7 +176,7 @@ Errors are RFC 9457 `ProblemDetail` responses (`application/problem+json`) with 
 |---|---|---|
 | 400 | `VALIDATION_FAILED` | A body field, `Idempotency-Key` (blank or over 64 characters) or `page`/`size` is invalid. `errors` lists them |
 | 400 | `UNKNOWN_LETTER_TYPE` | `POST /api/letter-runs` with a type that doesn't exist |
-| 400 | `BAD_REQUEST` | Missing header, an unreadable body (such as a bad date format), or an unsupported `Api-Version` |
+| 400 | `BAD_REQUEST` | Missing header or query parameter, an unreadable body (such as a bad date format), a path or query value of the wrong type (such as `/api/letter-runs/abc`), or an unsupported `Api-Version` |
 | 404 | `NOT_FOUND` | Unknown run, letter type or document (`EntityNotFoundException`), or unknown path |
 | 409 | `RUN_IN_PROGRESS` | The type has queue rows still flagged N, from any source |
 | 409 | `IDEMPOTENCY_KEY_REUSED` | The key was already used for a different type or date |
@@ -184,6 +184,9 @@ Errors are RFC 9457 `ProblemDetail` responses (`application/problem+json`) with 
 | 409 | `ALREADY_RELEASED` | Release of a run that is already STAFF_AND_EXTERNAL |
 | 409 | `NOT_RELEASED` | Revoke of a run that is STAFF_ONLY |
 | 422 | `NO_ELIGIBLE_APPLICATIONS` | Nothing to generate; nothing is written |
+| 405, 415, … | `METHOD_NOT_ALLOWED`, `UNSUPPORTED_MEDIA_TYPE`, … | Other framework errors keep their own status, and the status name is the code |
+| 409 | `CONFLICT` | A database constraint was violated |
+| 500 | `INTERNAL_SERVER_ERROR` | Anything unexpected. It's logged, and no details are returned |
 
 All of these come from `common/exception/GlobalExceptionHandler`. Not found uses `jakarta.persistence.EntityNotFoundException`, as in the reference project; business-rule failures use `BusinessRuleException`, which carries its status and code. Spring Security returns 401 and 403 itself, before a controller is reached, so those responses aren't ProblemDetails in the POC.
 
@@ -244,7 +247,7 @@ Then:
 
 Entities and `JpaRepository` interfaces are used throughout, matching the Places Been API.
 - **Schema:** Flyway owns it, and Hibernate runs with `ddl-auto: validate`, so a mismatch between an entity and the migrations fails at startup. That's also what the reference project plans to move to.
-- **Open-in-view** is off. Services are `@Transactional` (`jakarta.transaction.Transactional`, as in the reference), and list queries fetch the letter type with `@EntityGraph`, so there's no lazy loading outside a service and no N+1.
+- **Open-in-view** is off. Services are `@Transactional` (`jakarta.transaction.Transactional`, as in the reference), and list queries fetch the letter type with `@EntityGraph`, so there's no lazy loading outside a service and no N+1 on the run lists. The one exception is `DocumentVisibilityPolicy`, which runs one query per document (the run is fetched with it). One application has only a handful of documents, so that's fine for the POC. If external lists grow, replace it with a single query that takes all the documents' (app ID, type) pairs.
 - **Native SQL where JPA can't express the rule:** the eligibility rule and the generate `INSERT … SELECT` are native `@Query` methods. The eligibility rule reads the shared queue, which has no entity.
 
 **The exceptions:**
@@ -284,13 +287,13 @@ Scheduled jobs are switched on by `SchedulingConfig` (`letters.scheduling.enable
 
 ### Progress
 
-A run item counts as generated when a case-documents row of its type exists for its application. `LetterRunProgressService` refreshes GENERATING and NEEDS_ATTENTION runs on every `GET /api/letter-runs`, and the stuck detector refreshes them too.
+A run item counts as generated when a case-documents row of its type exists for its application. `LetterRunProgressService` refreshes GENERATING and NEEDS_ATTENTION runs on every `GET /api/letter-runs`. `GET /api/letter-runs/{id}`, release and the stuck detector refresh them too.
 
 The runs are loaded with a row lock (`findWithLockBy…`, `@Lock(PESSIMISTIC_WRITE)`) and then updated through their setters:
 - concurrent refreshes queue up instead of overwriting each other
 - a COMPLETE run is never recounted, even if a letter is later deleted
 
-`GET /api/letter-runs` therefore writes inside a GET. That's acceptable at this volume, and it avoids another scheduled job.
+`GET /api/letter-runs` and `GET /api/letter-runs/{id}` therefore take row locks and write inside a GET. That's acceptable at this volume, and it avoids another scheduled job.
 
 ### Release
 
