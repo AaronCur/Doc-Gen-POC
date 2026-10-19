@@ -100,4 +100,59 @@ describe('GenerateCard', () => {
 
     expect(generateButton().disabled).toBe(false);
   });
+
+  function button(label: string): HTMLButtonElement | undefined {
+    return Array.from<HTMLButtonElement>(fixture.nativeElement.querySelectorAll('button')).find(
+      (b) => b.textContent?.trim() === label,
+    );
+  }
+
+  it('shows that the eligible count is loading', async () => {
+    card.form.controls.letterType.setValue('LETTER_A');
+    await fixture.whenStable();
+    expect(text()).toContain('Checking eligible applications');
+
+    http.expectOne('/api/letter-types/LETTER_A/eligible-count').flush({ code: 'LETTER_A', eligibleCount: 5 });
+    await fixture.whenStable();
+    expect(text()).not.toContain('Checking eligible applications');
+  });
+
+  it('explains a failed eligible count under the field and retries it', async () => {
+    await setDate();
+    card.form.controls.letterType.setValue('LETTER_A');
+    http
+      .expectOne('/api/letter-types/LETTER_A/eligible-count')
+      .flush(null, { status: 503, statusText: 'Service Unavailable' });
+    await fixture.whenStable();
+
+    expect(generateButton().disabled).toBe(true);
+    expect(fixture.nativeElement.querySelector('mat-error')?.textContent).toContain(
+      "Couldn't check how many applications are eligible.",
+    );
+
+    button('Retry check')!.click();
+    http.expectOne('/api/letter-types/LETTER_A/eligible-count').flush({ code: 'LETTER_A', eligibleCount: 5 });
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector('mat-error')).toBeNull();
+    expect(button('Retry check')).toBeUndefined();
+    expect(generateButton().disabled).toBe(false);
+  });
+
+  it('shows a letter types load failure with a retry', async () => {
+    fixture.componentRef.setInput('letterTypesError', 'Could not reach the server. Please try again.');
+    await fixture.whenStable();
+    let retried = false;
+    card.retryLetterTypes.subscribe(() => (retried = true));
+
+    const alert = fixture.nativeElement.querySelector('[role="alert"]') as HTMLElement;
+    expect(alert.textContent).toContain("Couldn't load letter types. Could not reach the server.");
+    button('Retry')!.click();
+
+    expect(retried).toBe(true);
+  });
+
+  it('titles the card with a heading', () => {
+    expect(fixture.nativeElement.querySelector('h2')?.textContent).toBe('Generate letters');
+  });
 });

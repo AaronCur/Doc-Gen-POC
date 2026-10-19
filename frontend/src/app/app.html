@@ -1,12 +1,14 @@
-<mat-toolbar>
-  <mat-icon aria-hidden="true">mail</mat-icon>
-  <span class="title">Letter generation</span>
-  <span class="spacer"></span>
-  <span>Signed in as {{ devUser.name() }}</span>
-  <mat-chip-set aria-label="Your role">
-    <mat-chip class="role-chip">{{ devUser.roleLabel() }}</mat-chip>
-  </mat-chip-set>
-</mat-toolbar>
+<header>
+  <mat-toolbar>
+    <mat-icon aria-hidden="true">mail</mat-icon>
+    <h1 class="title">Letter generation</h1>
+    <span class="spacer"></span>
+    <span>Signed in as {{ devUser.name() }}</span>
+    <mat-chip-set aria-label="Your role">
+      <mat-chip class="role-chip">{{ devUser.roleLabel() }}</mat-chip>
+    </mat-chip-set>
+  </mat-toolbar>
+</header>
 
 <!-- POC ONLY: stands in for signing in through the real identity provider. -->
 <div class="poc-bar" role="region" aria-label="POC user switcher">

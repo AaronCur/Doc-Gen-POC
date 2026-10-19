@@ -33,6 +33,8 @@ export class LetterGenerationPage implements OnInit {
   protected readonly devUser = inject(DevUser);
 
   protected readonly letterTypes = signal<LetterType[]>([]);
+  /** Shown in the generate card with a retry; only admins use the letter types. */
+  protected readonly letterTypesError = signal<string | null>(null);
   protected readonly runs = signal<LetterRun[]>([]);
   protected readonly total = signal(0);
   protected readonly pageIndex = signal(0);
@@ -61,11 +63,16 @@ export class LetterGenerationPage implements OnInit {
   }
 
   ngOnInit(): void {
+    this.loadLetterTypes();
+    this.loadRuns();
+  }
+
+  protected loadLetterTypes(): void {
+    this.letterTypesError.set(null);
     this.api.letterTypes().subscribe({
       next: (types) => this.letterTypes.set(types),
-      error: (err) => this.showProblem(err),
+      error: (err) => this.letterTypesError.set(problemMessage(toProblem(err))),
     });
-    this.loadRuns();
   }
 
   protected onPage(event: PageEvent): void {

@@ -3,7 +3,9 @@
     [letterTypes]="letterTypes()"
     [activeLetterTypes]="activeLetterTypes()"
     [letterTypesWithRuns]="letterTypesWithRuns()"
+    [letterTypesError]="letterTypesError()"
     (generated)="onGenerated()"
+    (retryLetterTypes)="loadLetterTypes()"
   />
 } @else {
   <mat-card appearance="filled" role="note">
@@ -16,7 +18,7 @@
 
 <mat-card>
   <mat-card-header class="runs-header">
-    <mat-card-title>Letter generation runs</mat-card-title>
+    <h2 mat-card-title>Letter generation runs</h2>
     <span class="refresh-note">Progress refreshes automatically</span>
   </mat-card-header>
   <mat-card-content>
