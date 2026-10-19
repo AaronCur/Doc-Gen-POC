@@ -16,4 +16,11 @@ describe('App', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('mat-toolbar')?.textContent).toContain('Letter generation');
   });
+
+  it('puts the toolbar in a header landmark with the page heading', async () => {
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('header mat-toolbar h1')?.textContent).toBe('Letter generation');
+  });
 });

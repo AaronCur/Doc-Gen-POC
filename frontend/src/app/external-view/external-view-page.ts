@@ -29,7 +29,7 @@ import { problemMessage, toProblem } from '../api/problem';
   template: `
     <mat-card>
       <mat-card-header>
-        <mat-card-title>External view</mat-card-title>
+        <h2 mat-card-title>External view</h2>
         <mat-card-subtitle>Documents an external user can see for an application</mat-card-subtitle>
       </mat-card-header>
       <mat-card-content>

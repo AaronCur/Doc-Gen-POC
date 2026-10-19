@@ -51,10 +51,16 @@ export class GenerateCard {
   readonly activeLetterTypes = input<ReadonlySet<string>>(new Set());
   /** Letter types with any run among the runs the page has loaded. */
   readonly letterTypesWithRuns = input<ReadonlySet<string>>(new Set());
+  /** Why the page couldn't load the letter types; null once they have loaded. */
+  readonly letterTypesError = input<string | null>(null);
   readonly generated = output<LetterRun>();
+  readonly retryLetterTypes = output<void>();
 
   /** Eligible count for the selected type; null while unknown or loading. */
   readonly eligibleCount = signal<number | null>(null);
+  protected readonly countLoading = signal(false);
+  /** Why the eligible count couldn't be loaded; shown under the letter type with a retry. */
+  protected readonly countError = signal<string | null>(null);
 
   readonly form = new FormGroup({
     letterType: new FormControl<string | null>(null, [
@@ -123,8 +129,14 @@ export class GenerateCard {
       });
   }
 
+  protected retryEligibleCount(): void {
+    this.loadEligibleCount(this.form.controls.letterType.value);
+  }
+
   private loadEligibleCount(code: string | null): void {
     this.eligibleCount.set(null);
+    this.countError.set(null);
+    this.countLoading.set(!!code);
     this.revalidateLetterType();
     if (!code) {
       return;
@@ -132,11 +144,18 @@ export class GenerateCard {
     this.api.eligibleCount(code).subscribe({
       next: (result) => {
         if (this.form.controls.letterType.value === code) {
+          this.countLoading.set(false);
           this.eligibleCount.set(result.eligibleCount);
           this.revalidateLetterType();
         }
       },
-      error: (err) => this.snackBar.open(problemMessage(toProblem(err)), 'Dismiss', { duration: 6000 }),
+      error: (err) => {
+        if (this.form.controls.letterType.value === code) {
+          this.countLoading.set(false);
+          this.countError.set(problemMessage(toProblem(err)));
+          this.revalidateLetterType();
+        }
+      },
     });
   }
 
@@ -148,7 +167,10 @@ export class GenerateCard {
     }
   }
 
-  /** Errors shown under the letter type: a run still generating, or nothing left to generate. */
+  /**
+   * Errors shown under the letter type: a run still generating, the eligible count failing to
+   * load, or nothing left to generate.
+   */
   private letterTypeAvailable(control: AbstractControl<string | null>): ValidationErrors | null {
     const code = control.value;
     if (!code) {
@@ -156,6 +178,9 @@ export class GenerateCard {
     }
     if (this.activeLetterTypes?.().has(code)) {
       return { runActive: true };
+    }
+    if (this.countError?.()) {
+      return { countUnavailable: true };
     }
     if (this.eligibleCount?.() === 0) {
       return { noEligible: true };

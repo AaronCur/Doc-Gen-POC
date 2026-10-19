@@ -1,4 +1,5 @@
 @use 'sass:map';
+@use '@angular/cdk' as cdk;
 @use '@angular/material' as mat;
 // Generated with `ng generate @angular/material:theme-color` from the UX mockup's colours:
 // primary #1F4E79 (brand blue), tertiary #2E7D3E (green, used for "released" and "complete").
@@ -35,6 +36,14 @@ html {
       container-text-color: map.get(theme-colors.$primary-palette, 100),
     )
   );
+}
+
+// .cdk-visually-hidden: text for screen readers only.
+@include cdk.a11y-visually-hidden();
+
+// Card titles are <h2 mat-card-title> for the heading outline; drop the browser's heading margin.
+h2.mat-mdc-card-title {
+  margin: 0;
 }
 
 body {

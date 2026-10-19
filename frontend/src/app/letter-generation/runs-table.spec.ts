@@ -107,4 +107,13 @@ describe('RunsTable', () => {
 
     expect(emitted).toEqual(target);
   });
+
+  it('announces "No action" for a released run instead of the dash', async () => {
+    await render([run({ runId: 4, visibility: 'STAFF_AND_EXTERNAL', releasedBy: 'staff', releasedAt: '2026-03-03T10:00:00Z' })]);
+
+    const cell = rowFor(4).querySelector('td.action') as HTMLElement;
+    expect(cell.querySelector('[aria-label]')).toBeNull();
+    expect(cell.querySelector('[aria-hidden="true"]')?.textContent).toBe('—');
+    expect(cell.querySelector('.cdk-visually-hidden')?.textContent).toBe('No action');
+  });
 });

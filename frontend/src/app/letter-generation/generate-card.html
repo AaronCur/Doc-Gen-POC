@@ -1,6 +1,6 @@
 <mat-card>
   <mat-card-header>
-    <mat-card-title>Generate letters</mat-card-title>
+    <h2 mat-card-title>Generate letters</h2>
   </mat-card-header>
 
   <mat-card-content>
@@ -8,6 +8,12 @@
       Queues a letter of the selected type for every eligible application that doesn't already have one. New
       letters are visible to staff only until enabled for external users.
     </p>
+    @if (letterTypesError(); as message) {
+      <div class="load-error" role="alert">
+        <span>Couldn't load letter types. {{ message }}</span>
+        <button mat-button type="button" (click)="retryLetterTypes.emit()">Retry</button>
+      </div>
+    }
     <form class="fields" [formGroup]="form" (ngSubmit)="openConfirmation()">
       <mat-form-field appearance="outline">
         <mat-label>Letter type</mat-label>
@@ -18,10 +24,14 @@
         </mat-select>
         @if (form.controls.letterType.hasError('runActive')) {
           <mat-error>A run for this letter type is still generating. Wait for it to complete.</mat-error>
+        } @else if (form.controls.letterType.hasError('countUnavailable')) {
+          <mat-error>Couldn't check how many applications are eligible. {{ countError() }}</mat-error>
         } @else if (form.controls.letterType.hasError('noEligible')) {
           <mat-error>No new applications are awaiting this letter type.</mat-error>
         } @else if (form.controls.letterType.hasError('required')) {
           <mat-error>Select a letter type.</mat-error>
+        } @else if (countLoading()) {
+          <mat-hint>Checking eligible applications…</mat-hint>
         } @else if (hasPreviousRuns()) {
           <mat-hint>Previous runs exist for this type. Only applications without a letter of this type will be included.</mat-hint>
         }
@@ -41,6 +51,9 @@
       </mat-form-field>
 
       <div class="actions">
+        @if (countError()) {
+          <button mat-button type="button" (click)="retryEligibleCount()">Retry check</button>
+        }
         <button mat-flat-button type="submit" [disabled]="!canGenerate()">Generate</button>
       </div>
     </form>

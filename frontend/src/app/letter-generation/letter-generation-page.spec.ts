@@ -97,3 +97,36 @@ describe('LetterGenerationPage polling', () => {
     http.expectNone(RUNS_URL);
   });
 });
+
+describe('LetterGenerationPage letter types', () => {
+  let fixture: ComponentFixture<LetterGenerationPage>;
+  let http: HttpTestingController;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [LetterGenerationPage],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideNativeDateAdapter()],
+    }).compileComponents();
+
+    http = TestBed.inject(HttpTestingController);
+    fixture = TestBed.createComponent(LetterGenerationPage);
+    fixture.detectChanges(); // ngOnInit
+    http.expectOne(RUNS_URL).flush(page('COMPLETE'));
+  });
+
+  afterEach(() => http.verify());
+
+  it('shows a failed letter types load inline and retries it', async () => {
+    http.expectOne('/api/letter-types').flush(null, { status: 500, statusText: 'Server Error' });
+    await fixture.whenStable();
+
+    const alert = fixture.nativeElement.querySelector('app-generate-card [role="alert"]') as HTMLElement;
+    expect(alert.textContent).toContain("Couldn't load letter types.");
+
+    alert.querySelector('button')!.click();
+    http.expectOne('/api/letter-types').flush([{ code: 'LETTER_A', name: 'Letter type A' }]);
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.querySelector('app-generate-card [role="alert"]')).toBeNull();
+  });
+});
