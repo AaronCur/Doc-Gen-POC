@@ -59,10 +59,13 @@ describe('LetterGenerationPage polling', () => {
   });
 
   it('polls while a run is generating and stops when none are active', () => {
-    http.expectOne(RUNS_URL).flush(page('GENERATING', 'COMPLETE'));
+    http.expectOne(RUNS_URL).flush(page('QUEUED', 'COMPLETE'));
 
     vi.advanceTimersByTime(POLL_MS);
-    http.expectOne(RUNS_URL).flush(page('NEEDS_ATTENTION', 'COMPLETE')); // still active
+    http.expectOne(RUNS_URL).flush(page('IN_PROGRESS', 'COMPLETE')); // still active
+
+    vi.advanceTimersByTime(POLL_MS);
+    http.expectOne(RUNS_URL).flush(page('NEEDS_ATTENTION', 'COMPLETE')); // stalled, still polled
 
     vi.advanceTimersByTime(POLL_MS);
     http.expectOne(RUNS_URL).flush(page('COMPLETE', 'COMPLETE')); // nothing active now
@@ -79,7 +82,7 @@ describe('LetterGenerationPage polling', () => {
   });
 
   it('does not poll before the interval has passed', () => {
-    http.expectOne(RUNS_URL).flush(page('GENERATING'));
+    http.expectOne(RUNS_URL).flush(page('IN_PROGRESS'));
 
     vi.advanceTimersByTime(POLL_MS - 1);
     http.expectNone(RUNS_URL);
@@ -89,7 +92,7 @@ describe('LetterGenerationPage polling', () => {
   });
 
   it('stops polling when the page is destroyed', () => {
-    http.expectOne(RUNS_URL).flush(page('GENERATING'));
+    http.expectOne(RUNS_URL).flush(page('IN_PROGRESS'));
 
     fixture.destroy();
     vi.advanceTimersByTime(POLL_MS * 5);

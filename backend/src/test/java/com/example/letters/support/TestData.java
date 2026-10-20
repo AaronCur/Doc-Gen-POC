@@ -18,7 +18,6 @@ public class TestData {
 
     /** Deletes everything except reference data (letter types and their lock rows). */
     public void reset() {
-        jdbc.update("DELETE FROM letter_run_audit");
         jdbc.update("DELETE FROM letter_run_item");
         jdbc.update("DELETE FROM letter_run");
         jdbc.update("DELETE FROM letter_request_queue");

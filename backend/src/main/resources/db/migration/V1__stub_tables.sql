@@ -15,7 +15,7 @@ CREATE TABLE letter_types (
 );
 
 -- Stand-in for "is this application eligible for letter type X".
--- Real rule lives elsewhere; isolated behind EligibilityRepository.
+-- Real rule lives elsewhere; isolated behind ApplicationLetterEligibilityRepository.
 CREATE TABLE application_letter_eligibility (
   app_id       VARCHAR(40) NOT NULL,
   letter_type  VARCHAR(40) NOT NULL,
@@ -32,10 +32,12 @@ CREATE TABLE letter_request_queue (
   generated_flag  CHAR(1)      NOT NULL   -- 'N' or 'Y'
 );
 
+-- Stand-in for the existing documents table. Read only for case-service: nothing beyond
+-- this app_id index (standing in for whatever exists in production) is added to it.
 CREATE TABLE case_documents (
   doc_id         VARCHAR(40) PRIMARY KEY,
   app_id         VARCHAR(40) NOT NULL,
   document_type  VARCHAR(40) NOT NULL,
   created_at     TIMESTAMP   NOT NULL
 );
-CREATE INDEX ix_docs_app_type ON case_documents (app_id, document_type);
+CREATE INDEX ix_docs_app ON case_documents (app_id);

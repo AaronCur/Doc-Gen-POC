@@ -35,4 +35,11 @@ public class ExternalDocumentController {
     public ResponseEntity<List<DocumentResponse>> getExternalDocuments(@PathVariable String appId) {
         return ResponseEntity.ok(documentService.getExternalDocuments(appId));
     }
+
+    @GetMapping(value = "/documents/{docId}", version = "1")
+    @Operation(summary = "One document, if an external user can see it (EXTERNAL)",
+            description = "404 NOT_FOUND when the document doesn't exist or is not visible to external users.")
+    public ResponseEntity<DocumentResponse> getExternalDocumentById(@PathVariable String docId) {
+        return ResponseEntity.ok(documentService.getExternalDocumentById(docId));
+    }
 }

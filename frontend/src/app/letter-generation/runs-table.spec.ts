@@ -52,25 +52,44 @@ describe('RunsTable', () => {
   it('enables "Enable for external users" only for a COMPLETE, STAFF_ONLY run', async () => {
     await render([
       run({ runId: 1, status: 'COMPLETE', visibility: 'STAFF_ONLY' }),
-      run({ runId: 2, status: 'GENERATING', generatedCount: 3 }),
+      run({ runId: 2, status: 'IN_PROGRESS', generatedCount: 3 }),
       run({ runId: 3, status: 'NEEDS_ATTENTION', generatedCount: 9 }),
+      run({ runId: 5, status: 'QUEUED', generatedCount: 0 }),
       run({ runId: 4, visibility: 'STAFF_AND_EXTERNAL', releasedBy: 'staff', releasedAt: '2026-03-03T10:00:00Z' }),
     ]);
 
     expect(enableButton(1)?.disabled).toBe(false);
     expect(enableButton(2)?.disabled).toBe(true);
     expect(enableButton(3)?.disabled).toBe(true);
+    expect(enableButton(5)?.disabled).toBe(true);
     expect(enableButton(4)).toBeNull();
   });
 
   it('explains why Enable is unavailable', async () => {
     await render([
-      run({ runId: 2, status: 'GENERATING', generatedCount: 3 }),
+      run({ runId: 2, status: 'IN_PROGRESS', generatedCount: 3 }),
       run({ runId: 3, status: 'NEEDS_ATTENTION', generatedCount: 9 }),
+      run({ runId: 5, status: 'QUEUED', generatedCount: 0 }),
     ]);
 
     expect(rowFor(2).textContent).toContain('Available when generation completes');
+    expect(rowFor(5).textContent).toContain('Available when generation completes');
     expect(rowFor(3).textContent).toContain('Generation stalled; contact support');
+    expect(rowFor(3).textContent).not.toContain('Available when generation completes');
+  });
+
+  it('labels each calculated status', async () => {
+    await render([
+      run({ runId: 1, status: 'QUEUED', generatedCount: 0 }),
+      run({ runId: 2, status: 'IN_PROGRESS', generatedCount: 3 }),
+      run({ runId: 3, status: 'COMPLETE' }),
+      run({ runId: 4, status: 'NEEDS_ATTENTION', generatedCount: 9 }),
+    ]);
+
+    expect(rowFor(1).textContent).toContain('Queued');
+    expect(rowFor(2).textContent).toContain('In progress');
+    expect(rowFor(3).textContent).toContain('Complete');
+    expect(rowFor(4).textContent).toContain('Needs attention');
   });
 
   it('shows who enabled a released run', async () => {
@@ -90,7 +109,7 @@ describe('RunsTable', () => {
   });
 
   it('labels the progress bar for assistive technology', async () => {
-    await render([run({ runId: 2, status: 'GENERATING', generatedCount: 3 })]);
+    await render([run({ runId: 2, status: 'IN_PROGRESS', generatedCount: 3 })]);
 
     const bar = rowFor(2).querySelector('mat-progress-bar');
     expect(bar?.getAttribute('aria-label')).toBe('Letters generated for Letter type A: 3 of 10');

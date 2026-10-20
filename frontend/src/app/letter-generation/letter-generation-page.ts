@@ -14,7 +14,7 @@ import { EnableDialog } from './enable-dialog';
 import { GenerateCard } from './generate-card';
 import { RunsTable } from './runs-table';
 
-/** How often to poll GET /letter-runs while any run is GENERATING or NEEDS_ATTENTION. */
+/** How often to poll GET /letter-runs while any run is QUEUED, IN_PROGRESS or NEEDS_ATTENTION. */
 export const RUNS_POLL_INTERVAL_MS = new InjectionToken<number>('RUNS_POLL_INTERVAL_MS', {
   factory: () => 15_000,
 });

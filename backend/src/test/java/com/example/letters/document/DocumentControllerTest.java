@@ -51,6 +51,36 @@ public class DocumentControllerTest {
     }
 
     @Test
+    void shouldReturnOneExternalDocument() throws Exception {
+        when(documentService.getExternalDocumentById("DOC-1"))
+                .thenReturn(new DocumentResponse("DOC-1", "APP-0001", "LETTER_I", CREATED));
+
+        mockMvc.perform(get("/api/external/documents/DOC-1").header(VERSION, "1")
+                        .with(httpBasic("external", "external")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.docId").value("DOC-1"))
+                .andExpect(jsonPath("$.documentType").value("LETTER_I"));
+    }
+
+    @Test
+    void shouldReturn404ForAHiddenOrMissingExternalDocument() throws Exception {
+        when(documentService.getExternalDocumentById("DOC-HIDDEN"))
+                .thenThrow(new EntityNotFoundException("Document not found with id: DOC-HIDDEN"));
+
+        mockMvc.perform(get("/api/external/documents/DOC-HIDDEN").header(VERSION, "1")
+                        .with(httpBasic("external", "external")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    }
+
+    @Test
+    void staffCannotUseTheExternalSingleDocumentEndpoint() throws Exception {
+        mockMvc.perform(get("/api/external/documents/DOC-1").header(VERSION, "1").with(httpBasic("staff", "staff")))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(documentService);
+    }
+
+    @Test
     void shouldReturnStaffDocumentsWithTheVisibilityFlag() throws Exception {
         when(documentService.getStaffDocuments("APP-0001"))
                 .thenReturn(List.of(new StaffDocumentResponse("DOC-1", "APP-0001", "LETTER_A", CREATED, false)));

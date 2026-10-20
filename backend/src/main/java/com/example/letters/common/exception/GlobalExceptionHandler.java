@@ -61,7 +61,7 @@ public class GlobalExceptionHandler {
     }
 
     // 4. Bean validation through method validation. A controller with constraints on its parameters
-    //    (page size, Idempotency-Key) has its @Valid body validated this way too, so a request body's
+    //    (page and size) has its @Valid body validated this way too, so a request body's
     //    errors arrive as ParameterErrors and are reported per field, like handler 3.
     @ExceptionHandler(HandlerMethodValidationException.class)
     public ResponseEntity<ProblemDetail> handleMethodValidation(HandlerMethodValidationException ex) {
@@ -82,7 +82,7 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.BAD_REQUEST, "BAD_REQUEST", "Malformed JSON request body or invalid data types.");
     }
 
-    // 6. Missing request header (e.g. Idempotency-Key)
+    // 6. Missing required request header
     @ExceptionHandler(MissingRequestHeaderException.class)
     public ResponseEntity<ProblemDetail> handleMissingHeader(MissingRequestHeaderException ex) {
         return problem(HttpStatus.BAD_REQUEST, "BAD_REQUEST",

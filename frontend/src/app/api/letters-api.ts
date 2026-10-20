@@ -28,11 +28,9 @@ export class LettersApi {
     );
   }
 
-  /** The same Idempotency-Key must be sent again when retrying the same request. */
-  generate(request: GenerateRequest, idempotencyKey: string): Observable<LetterRun> {
-    return this.http.post<LetterRun>(`${API}/letter-runs`, request, {
-      headers: { 'Idempotency-Key': idempotencyKey },
-    });
+  /** Duplicates are rejected by the server (409 RUN_IN_PROGRESS), so no idempotency key is sent. */
+  generate(request: GenerateRequest): Observable<LetterRun> {
+    return this.http.post<LetterRun>(`${API}/letter-runs`, request);
   }
 
   listRuns(page: number, size: number): Observable<RunPage> {

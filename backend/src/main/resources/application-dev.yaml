@@ -6,6 +6,10 @@ spring:
   flyway:
     locations: classpath:db/migration,classpath:db/seed-dev
 
+# Short threshold so the stuck-run demo (APP-0043) shows Needs attention within minutes.
+letters:
+  needs-attention-after: 2m
+
 # Simulated letter-generator (NOT part of case-service; see the simulatedgenerator package)
 simulated-generator:
   interval: 10s

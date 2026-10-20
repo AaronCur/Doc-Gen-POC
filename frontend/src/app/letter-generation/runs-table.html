@@ -78,7 +78,7 @@
         </button>
         @if (run.status === 'NEEDS_ATTENTION') {
           <div class="secondary hint" [id]="'enable-hint-' + run.runId">Generation stalled; contact support</div>
-        } @else if (run.status === 'GENERATING') {
+        } @else if (run.status === 'QUEUED' || run.status === 'IN_PROGRESS') {
           <div class="secondary hint" [id]="'enable-hint-' + run.runId">Available when generation completes</div>
         }
       }
