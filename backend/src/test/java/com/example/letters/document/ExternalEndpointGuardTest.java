@@ -20,7 +20,8 @@ class ExternalEndpointGuardTest extends IntegrationTest {
 
     /** Every /api/external endpoint, each covered by DocumentVisibilityTest. */
     private static final List<String> COVERED_EXTERNAL_ENDPOINTS = List.of(
-            "/api/external/applications/{appId}/documents");
+            "/api/external/applications/{appId}/documents",
+            "/api/external/documents/{docId}");
 
     @Autowired
     @Qualifier("requestMappingHandlerMapping")

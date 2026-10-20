@@ -86,12 +86,6 @@ export class GenerateDialog {
   private readonly dialogRef = inject<MatDialogRef<GenerateDialog, GenerateDialogResult>>(MatDialogRef);
   private readonly api = inject(LettersApi);
 
-  /**
-   * Created once, when the dialog opens, and reused on every retry, so a retry after a lost
-   * response returns the run the first attempt created instead of creating a second one.
-   */
-  readonly idempotencyKey = crypto.randomUUID();
-
   protected readonly submitting = signal(false);
   protected readonly retryError = signal<string | null>(null);
 
@@ -100,10 +94,7 @@ export class GenerateDialog {
     this.retryError.set(null);
     this.dialogRef.disableClose = true;
     this.api
-      .generate(
-        { letterType: this.data.letterType, claimSubmittedDate: this.data.claimSubmittedDate },
-        this.idempotencyKey,
-      )
+      .generate({ letterType: this.data.letterType, claimSubmittedDate: this.data.claimSubmittedDate })
       .subscribe({
         next: (run) => this.dialogRef.close({ run }),
         error: (err) => {

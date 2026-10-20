@@ -10,7 +10,8 @@ export interface EligibleCount {
   eligibleCount: number;
 }
 
-export type RunStatus = 'GENERATING' | 'COMPLETE' | 'NEEDS_ATTENTION';
+/** Calculated by case-service on every read; never stored. */
+export type RunStatus = 'QUEUED' | 'IN_PROGRESS' | 'COMPLETE' | 'NEEDS_ATTENTION';
 export type RunVisibility = 'STAFF_ONLY' | 'STAFF_AND_EXTERNAL';
 
 export interface LetterRun {
@@ -47,7 +48,7 @@ export interface CaseDocument {
   createdAt: string;
 }
 
-/** A run the generator is still working on (or has stalled on). */
+/** A run that is not complete yet: queued, in progress, or stalled. */
 export function isActive(run: LetterRun): boolean {
-  return run.status === 'GENERATING' || run.status === 'NEEDS_ATTENTION';
+  return run.status !== 'COMPLETE';
 }

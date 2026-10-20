@@ -59,17 +59,60 @@ class DocumentVisibilityTest extends IntegrationTest {
         assertThat(externalDocIds("APP-1")).containsExactly(documentId(runId, "APP-1"));
     }
 
+    /** The README's manual revoke procedure, run exactly as documented. */
     @Test
-    void revokingHidesTheLettersAgain() throws Exception {
+    void theManualRevokeProcedureHidesTheLettersAgain() throws Exception {
         data.eligibleApplication("APP-1", TYPE);
         long runId = generateRun(TYPE);
         produceLetters(runId);
         release(runId);
 
-        mvc.perform(post("/api/letter-runs/{id}/revoke", runId).with(httpBasic("admin", "admin")))
-                .andExpect(status().isOk());
+        int updated = jdbc.update("""
+                UPDATE letter_run
+                SET    visibility = 'STAFF_ONLY', released_by = NULL, released_at = NULL
+                WHERE  run_id = ? AND visibility = 'STAFF_AND_EXTERNAL'
+                """, runId);
 
+        assertThat(updated).isEqualTo(1);
         assertThat(externalDocIds("APP-1")).isEmpty();
+    }
+
+    // --- GET /api/external/documents/{docId} ---
+
+    @Test
+    void anExistingLetterWithNoRunCanBeFetchedById() throws Exception {
+        data.eligibleApplication("APP-1", TYPE);
+        data.document("DOC-OLD", "APP-1", TYPE);
+
+        mvc.perform(get("/api/external/documents/DOC-OLD").with(httpBasic("external", "external")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.docId").value("DOC-OLD"));
+    }
+
+    @Test
+    void aStaffOnlyLetterIsNotFoundById() throws Exception {
+        data.eligibleApplication("APP-1", TYPE);
+        long runId = generateRun(TYPE);
+        produceLetters(runId);
+
+        mvc.perform(get("/api/external/documents/{docId}", documentId(runId, "APP-1"))
+                        .with(httpBasic("external", "external")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.detail").value("Document not found with id: " + documentId(runId, "APP-1")));
+    }
+
+    @Test
+    void aReleasedLetterCanBeFetchedById() throws Exception {
+        data.eligibleApplication("APP-1", TYPE);
+        long runId = generateRun(TYPE);
+        produceLetters(runId);
+        release(runId);
+
+        mvc.perform(get("/api/external/documents/{docId}", documentId(runId, "APP-1"))
+                        .with(httpBasic("external", "external")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documentType").value(TYPE));
     }
 
     @Test

@@ -10,7 +10,8 @@ import { MatTableModule } from '@angular/material/table';
 import { LetterRun, RunStatus } from '../api/models';
 
 const STATUS_LABELS: Record<RunStatus, string> = {
-  GENERATING: 'Generating',
+  QUEUED: 'Queued',
+  IN_PROGRESS: 'In progress',
   COMPLETE: 'Complete',
   NEEDS_ATTENTION: 'Needs attention',
 };

@@ -20,7 +20,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-/** One admin request to generate letters of a type, and where it has got to. */
+/**
+ * One admin Generate click. Only facts that can't be calculated are stored: the generated count
+ * and the status are derived on read (see {@link LetterRunStatusService}).
+ */
 @Entity
 @Table(name = "letter_run")
 @Getter
@@ -42,23 +45,11 @@ public class LetterRun {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private RunStatus status;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
     private RunVisibility visibility;
 
-    @Column(name = "total_count", nullable = false)
-    private int totalCount;
-
-    @Column(name = "generated_count", nullable = false)
-    private int generatedCount;
-
-    @Column(name = "last_progress_at", nullable = false)
-    private Instant lastProgressAt;
-
-    @Column(name = "completed_at")
-    private Instant completedAt;
+    /** Number of run items, set once at Generate. */
+    @Column(name = "total_requested", nullable = false)
+    private int totalRequested;
 
     @Column(name = "requested_by", nullable = false)
     private String requestedBy;
@@ -66,32 +57,23 @@ public class LetterRun {
     @Column(name = "requested_at", nullable = false)
     private Instant requestedAt;
 
+    /** Set the first time every item has a document; a completed run always shows total / total. */
+    @Column(name = "completed_at")
+    private Instant completedAt;
+
     @Column(name = "released_by")
     private String releasedBy;
 
     @Column(name = "released_at")
     private Instant releasedAt;
 
-    @Column(name = "idempotency_key", nullable = false, unique = true)
-    private String idempotencyKey;
-
-    /** A new run: GENERATING, visible to staff only, with nothing counted yet. */
-    public LetterRun(LetterType letterType, LocalDate claimSubmittedDate, String requestedBy, String idempotencyKey,
-            Instant now) {
+    /** A new run, visible to staff only. The total is set once the items are recorded. */
+    public LetterRun(LetterType letterType, LocalDate claimSubmittedDate, String requestedBy, Instant now) {
         this.letterType = letterType;
         this.claimSubmittedDate = claimSubmittedDate;
-        this.status = RunStatus.GENERATING;
         this.visibility = RunVisibility.STAFF_ONLY;
-        this.totalCount = 0;
-        this.generatedCount = 0;
-        this.lastProgressAt = now;
+        this.totalRequested = 0;
         this.requestedBy = requestedBy;
         this.requestedAt = now;
-        this.idempotencyKey = idempotencyKey;
-    }
-
-    /** Still being worked on by the letter-generator (or stalled). */
-    public boolean isActive() {
-        return status == RunStatus.GENERATING || status == RunStatus.NEEDS_ATTENTION;
     }
 }

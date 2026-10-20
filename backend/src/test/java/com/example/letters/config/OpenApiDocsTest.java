@@ -32,19 +32,18 @@ class OpenApiDocsTest extends IntegrationTest {
                 .andExpect(jsonPath("$.paths['/api/letter-runs'].post").exists())
                 .andExpect(jsonPath("$.paths['/api/letter-runs/{id}'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/letter-runs/{id}/release'].post").exists())
-                .andExpect(jsonPath("$.paths['/api/letter-runs/{id}/revoke'].post").exists())
+                .andExpect(jsonPath("$.paths['/api/letter-runs/{id}/pending'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/letter-runs/{id}/revoke']").doesNotExist())
+                .andExpect(jsonPath("$.paths['/api/external/documents/{docId}'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/external/applications/{appId}/documents'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/staff/applications/{appId}/documents'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/staff/documents/{docId}'].delete").exists());
     }
 
     @Test
-    void generateDocumentsTheIdempotencyKeyHeader() throws Exception {
+    void generateTakesNoIdempotencyKeyHeader() throws Exception {
         mvc.perform(get("/v3/api-docs"))
-                .andExpect(jsonPath("$.paths['/api/letter-runs'].post.parameters[?(@.name == 'Idempotency-Key')].in")
-                        .value(hasItem("header")))
-                .andExpect(jsonPath("$.paths['/api/letter-runs'].post.parameters[?(@.name == 'Idempotency-Key')].required")
-                        .value(hasItem(true)));
+                .andExpect(jsonPath("$.paths['/api/letter-runs'].post.parameters[?(@.name == 'Idempotency-Key')]").isEmpty());
     }
 
     @Test

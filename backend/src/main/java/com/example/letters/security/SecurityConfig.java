@@ -40,12 +40,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/letter-types").hasAnyRole(ADMIN, STAFF)
                         .requestMatchers(HttpMethod.GET, "/api/letter-types/*/eligible-count").hasRole(ADMIN)
 
-                        .requestMatchers(HttpMethod.GET, "/api/letter-runs", "/api/letter-runs/*").hasAnyRole(ADMIN, STAFF)
+                        .requestMatchers(HttpMethod.GET, "/api/letter-runs", "/api/letter-runs/*", "/api/letter-runs/*/pending")
+                        .hasAnyRole(ADMIN, STAFF)
                         .requestMatchers(HttpMethod.POST, "/api/letter-runs").hasRole(ADMIN)
                         .requestMatchers(HttpMethod.POST, "/api/letter-runs/*/release").hasRole(STAFF)
-                        .requestMatchers(HttpMethod.POST, "/api/letter-runs/*/revoke").hasRole(ADMIN)
 
-                        .requestMatchers(HttpMethod.GET, "/api/external/applications/*/documents").hasRole(EXTERNAL)
+                        .requestMatchers(HttpMethod.GET, "/api/external/applications/*/documents", "/api/external/documents/*")
+                        .hasRole(EXTERNAL)
                         .requestMatchers(HttpMethod.GET, "/api/staff/applications/*/documents").hasRole(STAFF)
                         .requestMatchers(HttpMethod.DELETE, "/api/staff/documents/*").hasRole(STAFF)
 

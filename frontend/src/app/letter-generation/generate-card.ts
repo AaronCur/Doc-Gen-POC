@@ -45,7 +45,7 @@ export class GenerateCard {
 
   readonly letterTypes = input.required<LetterType[]>();
   /**
-   * Letter types with a GENERATING or NEEDS_ATTENTION run, from the runs the page has loaded.
+   * Letter types with a QUEUED, IN_PROGRESS or NEEDS_ATTENTION run, from the runs the page has loaded.
    * case-service also rejects a second run (409 RUN_IN_PROGRESS), so this is guidance only.
    */
   readonly activeLetterTypes = input<ReadonlySet<string>>(new Set());

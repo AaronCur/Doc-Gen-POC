@@ -15,7 +15,10 @@ export function toProblem(error: unknown): ApiProblem {
   return { status: 0 };
 }
 
-/** Worth retrying with the same Idempotency-Key: the request may not have reached the server. */
+/**
+ * Worth retrying: the request may not have reached the server. If it did, the retry is rejected
+ * with 409 RUN_IN_PROGRESS rather than creating a second run.
+ */
 export function isRetryable(problem: ApiProblem): boolean {
   return problem.status === 0 || problem.status >= 500;
 }
@@ -23,7 +26,6 @@ export function isRetryable(problem: ApiProblem): boolean {
 const MESSAGES: Record<string, string> = {
   RUN_IN_PROGRESS: 'A run for this letter type is still generating.',
   NO_ELIGIBLE_APPLICATIONS: 'No new applications are awaiting this letter type.',
-  IDEMPOTENCY_KEY_REUSED: 'This request was already submitted with different details. Please start again.',
   NOT_COMPLETE: 'This run can be enabled when generation completes.',
   ALREADY_RELEASED: 'This run is already visible to external users.',
   VALIDATION_FAILED: 'Please check the letter type and claim submitted date.',

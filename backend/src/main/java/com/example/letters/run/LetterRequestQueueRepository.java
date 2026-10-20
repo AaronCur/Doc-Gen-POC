@@ -31,13 +31,18 @@ public class LetterRequestQueueRepository {
         return count == null ? 0 : count;
     }
 
-    /** Queues one request per run item. The run items are the source of truth for membership. */
+    /**
+     * Queues one request per run item. The run items are the source of truth for membership; the
+     * queue key ({@code appid_lettertype}) is built here rather than stored on the item. Nested
+     * two-argument CONCAT is the portable form of {@code CONCAT(i.app_id, '_', i.letter_type)}
+     * (Oracle's CONCAT takes only two arguments).
+     */
     public int insertPendingForRun(long runId) {
         return jdbc.update("""
                 INSERT INTO letter_request_queue (queue_key, letter_type, generated_flag)
-                SELECT queue_key, letter_type, 'N'
-                FROM   letter_run_item
-                WHERE  run_id = :runId
+                SELECT CONCAT(CONCAT(i.app_id, '_'), i.letter_type), i.letter_type, 'N'
+                FROM   letter_run_item i
+                WHERE  i.run_id = :runId
                 """, Map.of("runId", runId));
     }
 }

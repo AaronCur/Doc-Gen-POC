@@ -9,51 +9,47 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import com.example.letters.support.IntegrationTest;
 import com.example.letters.common.exception.BusinessRuleException;
+import com.example.letters.support.IntegrationTest;
 
 class GenerateTest extends IntegrationTest {
 
     private static final String TYPE = "LETTER_A";
     private static final LocalDate CLAIM_DATE = LocalDate.of(2026, 2, 1);
+    private static final LetterRunRequest REQUEST = new LetterRunRequest(TYPE, CLAIM_DATE);
 
     @Autowired
     LetterRunService service;
 
-    @Autowired
-    LetterRunRepository runs;
-
     @Test
-    void writesRunItemsQueueRowsAndAudit() {
+    void writesTheRunItemsAndQueueRows() {
         data.eligibleApplication("APP-1", TYPE);
         data.eligibleApplication("APP-2", TYPE);
         data.eligibleApplication("APP-3", TYPE);
         data.document("DOC-1", "APP-3", TYPE); // already has a letter: excluded
 
-        var result = service.generateLetters(new LetterRunRequest(TYPE, CLAIM_DATE), "key-1", "admin");
+        LetterRunResponse run = service.generateLetters(REQUEST, "admin");
 
-        assertThat(result.created()).isTrue();
-        LetterRunResponse run = result.run();
         assertThat(run.letterType()).isEqualTo(TYPE);
         assertThat(run.letterTypeName()).isEqualTo("Letter type A");
         assertThat(run.claimSubmittedDate()).isEqualTo(CLAIM_DATE);
-        assertThat(run.status()).isEqualTo(RunStatus.GENERATING);
+        assertThat(run.status()).isEqualTo(RunStatus.QUEUED);
         assertThat(run.visibility()).isEqualTo(RunVisibility.STAFF_ONLY);
         assertThat(run.totalCount()).isEqualTo(2);
         assertThat(run.generatedCount()).isZero();
         assertThat(run.requestedBy()).isEqualTo("admin");
         assertThat(run.requestedAt()).isEqualTo(START);
-        assertThat(runs.findById(run.runId()).orElseThrow().getLastProgressAt()).isEqualTo(START);
 
+        assertThat(jdbc.queryForObject(
+                "SELECT total_requested FROM letter_run WHERE run_id = ?", Integer.class, run.runId())).isEqualTo(2);
         assertThat(jdbc.queryForList(
-                "SELECT queue_key FROM letter_run_item WHERE run_id = ? ORDER BY app_id", String.class, run.runId()))
-                .containsExactly("APP-1_LETTER_A", "APP-2_LETTER_A");
+                "SELECT app_id || ':' || letter_type FROM letter_run_item WHERE run_id = ? ORDER BY app_id",
+                String.class, run.runId()))
+                .containsExactly("APP-1:LETTER_A", "APP-2:LETTER_A");
+        // The queue key is built in the queue insert: appid_lettertype.
         assertThat(jdbc.queryForList(
                 "SELECT queue_key FROM letter_request_queue WHERE generated_flag = 'N' ORDER BY queue_key", String.class))
                 .containsExactly("APP-1_LETTER_A", "APP-2_LETTER_A");
-        assertThat(jdbc.queryForList(
-                "SELECT action FROM letter_run_audit WHERE run_id = ? AND actor = 'admin'", String.class, run.runId()))
-                .containsExactly("GENERATE");
     }
 
     @Test
@@ -61,7 +57,7 @@ class GenerateTest extends IntegrationTest {
         data.eligibleApplication("APP-1", TYPE);
         data.document("DOC-1", "APP-1", TYPE);
 
-        assertThatThrownBy(() -> service.generateLetters(new LetterRunRequest(TYPE, CLAIM_DATE), "key-1", "admin"))
+        assertThatThrownBy(() -> service.generateLetters(REQUEST, "admin"))
                 .isInstanceOfSatisfying(BusinessRuleException.class, e -> {
                     assertThat(e.getStatus().value()).isEqualTo(422);
                     assertThat(e.getCode()).isEqualTo("NO_ELIGIBLE_APPLICATIONS");
@@ -71,35 +67,12 @@ class GenerateTest extends IntegrationTest {
     }
 
     @Test
-    void repeatedIdempotencyKeyReturnsTheSameRun() {
+    void aSecondGenerateWhileOneIsPendingReturns409() {
         data.eligibleApplication("APP-1", TYPE);
-
-        var first = service.generateLetters(new LetterRunRequest(TYPE, CLAIM_DATE), "key-1", "admin");
-        var second = service.generateLetters(new LetterRunRequest(TYPE, CLAIM_DATE), "key-1", "admin");
-
-        assertThat(second.created()).isFalse();
-        assertThat(second.run().runId()).isEqualTo(first.run().runId());
-        assertThat(count("SELECT COUNT(*) FROM letter_run")).isEqualTo(1);
-        assertThat(count("SELECT COUNT(*) FROM letter_request_queue")).isEqualTo(1);
-    }
-
-    @Test
-    void idempotencyKeyReusedForADifferentRequestReturns409() {
-        data.eligibleApplication("APP-1", TYPE);
-        service.generateLetters(new LetterRunRequest(TYPE, CLAIM_DATE), "key-1", "admin");
-
-        assertThatThrownBy(() -> service.generateLetters(new LetterRunRequest(TYPE, CLAIM_DATE.plusDays(1)), "key-1", "admin"))
-                .isInstanceOfSatisfying(BusinessRuleException.class,
-                        e -> assertThat(e.getCode()).isEqualTo("IDEMPOTENCY_KEY_REUSED"));
-    }
-
-    @Test
-    void secondGenerateWhileOneIsPendingReturns409() {
-        data.eligibleApplication("APP-1", TYPE);
-        service.generateLetters(new LetterRunRequest(TYPE, CLAIM_DATE), "key-1", "admin");
+        service.generateLetters(REQUEST, "admin");
         data.eligibleApplication("APP-2", TYPE);
 
-        assertThatThrownBy(() -> service.generateLetters(new LetterRunRequest(TYPE, CLAIM_DATE), "key-2", "admin"))
+        assertThatThrownBy(() -> service.generateLetters(REQUEST, "admin"))
                 .isInstanceOfSatisfying(BusinessRuleException.class, e -> {
                     assertThat(e.getStatus().value()).isEqualTo(409);
                     assertThat(e.getCode()).isEqualTo("RUN_IN_PROGRESS");
@@ -108,48 +81,61 @@ class GenerateTest extends IntegrationTest {
     }
 
     @Test
-    void pendingRowFromAnotherSourceAlsoBlocksGenerate() {
+    void aRepeatedClickIsRejectedRatherThanDuplicated() {
+        // Without an idempotency key, the pending check is what stops a double submit.
+        data.eligibleApplication("APP-1", TYPE);
+        service.generateLetters(REQUEST, "admin");
+
+        assertThatThrownBy(() -> service.generateLetters(REQUEST, "admin"))
+                .isInstanceOfSatisfying(BusinessRuleException.class,
+                        e -> assertThat(e.getCode()).isEqualTo("RUN_IN_PROGRESS"));
+        assertThat(count("SELECT COUNT(*) FROM letter_request_queue")).isEqualTo(1);
+    }
+
+    @Test
+    void aPendingRowFromAnotherSourceAlsoBlocksGenerate() {
         // e.g. a datafix inserted a row for this type and the generator has not processed it yet
         data.eligibleApplication("APP-1", TYPE);
         data.queueRow("APP-9", TYPE, 'N');
 
-        assertThatThrownBy(() -> service.generateLetters(new LetterRunRequest(TYPE, CLAIM_DATE), "key-1", "admin"))
+        assertThatThrownBy(() -> service.generateLetters(REQUEST, "admin"))
                 .isInstanceOfSatisfying(BusinessRuleException.class,
                         e -> assertThat(e.getCode()).isEqualTo("RUN_IN_PROGRESS"));
     }
 
     @Test
-    void pendingRowForAnotherTypeDoesNotBlock() {
+    void aPendingRowForAnotherTypeDoesNotBlock() {
         data.eligibleApplication("APP-1", TYPE);
         data.queueRow("APP-1", "LETTER_B", 'N');
 
-        assertThat(service.generateLetters(new LetterRunRequest(TYPE, CLAIM_DATE), "key-1", "admin").created()).isTrue();
+        assertThat(service.generateLetters(REQUEST, "admin").totalCount()).isEqualTo(1);
     }
 
     @Test
-    void repeatRunPicksUpOnlyApplicationsWithoutALetter() {
+    void aRepeatRunPicksUpOnlyApplicationsWithoutALetter() {
         data.eligibleApplication("APP-1", TYPE);
         data.eligibleApplication("APP-2", TYPE);
-        long firstRun = service.generateLetters(new LetterRunRequest(TYPE, CLAIM_DATE), "key-1", "admin").run().runId();
+        long firstRun = service.generateLetters(REQUEST, "admin").runId();
         simulateGeneratorProcessedEverything();
 
         data.eligibleApplication("APP-3", TYPE);
-        var second = service.generateLetters(new LetterRunRequest(TYPE, CLAIM_DATE), "key-2", "admin");
+        LetterRunResponse second = service.generateLetters(REQUEST, "admin");
 
-        assertThat(second.run().runId()).isNotEqualTo(firstRun);
-        assertThat(second.run().totalCount()).isEqualTo(1);
+        assertThat(second.runId()).isNotEqualTo(firstRun);
+        assertThat(second.totalCount()).isEqualTo(1);
         assertThat(jdbc.queryForList(
-                "SELECT app_id FROM letter_run_item WHERE run_id = ?", String.class, second.run().runId()))
+                "SELECT app_id FROM letter_run_item WHERE run_id = ?", String.class, second.runId()))
                 .containsExactly("APP-3");
     }
 
     @Test
-    void unknownLetterTypeIsRejected() {
-        assertThatThrownBy(() -> service.generateLetters(new LetterRunRequest("LETTER_Z", CLAIM_DATE), "key-1", "admin"))
+    void anUnknownLetterTypeIsRejectedWith400() {
+        assertThatThrownBy(() -> service.generateLetters(new LetterRunRequest("LETTER_Z", CLAIM_DATE), "admin"))
                 .isInstanceOfSatisfying(BusinessRuleException.class, e -> {
                     assertThat(e.getStatus().value()).isEqualTo(400);
                     assertThat(e.getCode()).isEqualTo("UNKNOWN_LETTER_TYPE");
                 });
+        assertNothingWritten();
     }
 
     /** What the external letter-generator does: a document per pending row, then flag Y. */
@@ -166,7 +152,6 @@ class GenerateTest extends IntegrationTest {
     private void assertNothingWritten() {
         assertThat(count("SELECT COUNT(*) FROM letter_run")).isZero();
         assertThat(count("SELECT COUNT(*) FROM letter_run_item")).isZero();
-        assertThat(count("SELECT COUNT(*) FROM letter_run_audit")).isZero();
         assertThat(count("SELECT COUNT(*) FROM letter_request_queue")).isZero();
     }
 }

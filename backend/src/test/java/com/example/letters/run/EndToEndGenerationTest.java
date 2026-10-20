@@ -30,12 +30,13 @@ class EndToEndGenerationTest extends IntegrationTest {
         }
         var generator = new SimulatedLetterGenerator(jdbc, transactions, clock,
                 new SimulatedGeneratorProperties(Duration.ofSeconds(10), 5, List.of()));
-        long runId = service.generateLetters(new LetterRunRequest("LETTER_A", LocalDate.of(2026, 2, 1)), "key-1", "admin")
-                .run().runId();
+        long runId = service.generateLetters(new LetterRunRequest("LETTER_A", LocalDate.of(2026, 2, 1)), "admin")
+                .runId();
+        assertThat(listedRun(runId).status()).isEqualTo(RunStatus.QUEUED);
 
         generator.tick();
         assertThat(listedRun(runId).generatedCount()).isEqualTo(5);
-        assertThat(listedRun(runId).status()).isEqualTo(RunStatus.GENERATING);
+        assertThat(listedRun(runId).status()).isEqualTo(RunStatus.IN_PROGRESS);
 
         generator.tick();
         generator.tick();

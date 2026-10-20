@@ -3,7 +3,6 @@ package com.example.letters.support;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Map;
-import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +13,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import com.example.letters.run.LetterRunProgressService;
+import com.example.letters.run.LetterRunCompletionJob;
 import com.example.letters.run.LetterRunRequest;
 import com.example.letters.run.LetterRunService;
 
@@ -63,17 +62,17 @@ public abstract class IntegrationTest {
     private LetterRunService runService;
 
     @Autowired
-    private LetterRunProgressService runProgress;
+    private LetterRunCompletionJob completionJob;
 
     /** Generates a run for every currently eligible application of the type; returns its ID. */
     protected long generateRun(String letterType) {
-        return runService.generateLetters(new LetterRunRequest(letterType, LocalDate.of(2026, 2, 1)),
-                UUID.randomUUID().toString(), "admin").run().runId();
+        return runService.generateLetters(new LetterRunRequest(letterType, LocalDate.of(2026, 2, 1)), "admin")
+                .runId();
     }
 
     /**
      * Does what the letter-generator would: a document for each of the run's items that has none,
-     * flag Y on the queue, then a progress refresh (which completes the run).
+     * flag Y on the queue, then the completion job (which sets completed_at).
      */
     protected void produceLetters(long runId) {
         for (Map<String, Object> item : jdbc.queryForList(
@@ -84,7 +83,7 @@ public abstract class IntegrationTest {
             jdbc.update("UPDATE letter_request_queue SET generated_flag = 'Y' WHERE queue_key = ?",
                     appId + "_" + letterType);
         }
-        runProgress.refreshActiveRuns();
+        completionJob.check();
     }
 
     /** The doc ID {@link #produceLetters} gives the letter for an application in a run. */

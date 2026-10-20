@@ -27,16 +27,16 @@ class GenerateConcurrencyTest extends IntegrationTest {
     LetterRunService service;
 
     @RepeatedTest(5)
-    void differentKeysProduceExactlyOneRunAndNoDuplicateQueueRows() throws Exception {
+    void twoGenerateRequestsAtOnceProduceExactlyOneRunAndNoDuplicateQueueRows() throws Exception {
         for (int i = 1; i <= 20; i++) {
             data.eligibleApplication("APP-" + i, TYPE);
         }
 
         List<Object> outcomes = runConcurrently(
-                () -> service.generateLetters(new LetterRunRequest(TYPE, CLAIM_DATE), "key-1", "admin"),
-                () -> service.generateLetters(new LetterRunRequest(TYPE, CLAIM_DATE), "key-2", "admin"));
+                () -> service.generateLetters(new LetterRunRequest(TYPE, CLAIM_DATE), "admin"),
+                () -> service.generateLetters(new LetterRunRequest(TYPE, CLAIM_DATE), "admin"));
 
-        assertThat(outcomes).filteredOn(o -> o instanceof LetterRunService.GenerateResult).hasSize(1);
+        assertThat(outcomes).filteredOn(o -> o instanceof LetterRunResponse).hasSize(1);
         assertThat(outcomes).filteredOn(o -> o instanceof BusinessRuleException e && e.getCode().equals("RUN_IN_PROGRESS"))
                 .hasSize(1);
 
@@ -49,22 +49,6 @@ class GenerateConcurrencyTest extends IntegrationTest {
                   GROUP BY queue_key HAVING COUNT(*) > 1
                 ) duplicates
                 """)).isZero();
-    }
-
-    @RepeatedTest(5)
-    void sameKeyProducesOneRunAndBothCallersGetIt() throws Exception {
-        data.eligibleApplication("APP-1", TYPE);
-
-        List<Object> outcomes = runConcurrently(
-                () -> service.generateLetters(new LetterRunRequest(TYPE, CLAIM_DATE), "key-1", "admin"),
-                () -> service.generateLetters(new LetterRunRequest(TYPE, CLAIM_DATE), "key-1", "admin"));
-
-        assertThat(outcomes).allMatch(o -> o instanceof LetterRunService.GenerateResult);
-        assertThat(outcomes).extracting(o -> ((LetterRunService.GenerateResult) o).run().runId())
-                .containsOnly(outcomes.stream()
-                        .map(o -> ((LetterRunService.GenerateResult) o).run().runId()).findFirst().orElseThrow());
-        assertThat(outcomes).filteredOn(o -> ((LetterRunService.GenerateResult) o).created()).hasSize(1);
-        assertThat(count("SELECT COUNT(*) FROM letter_request_queue")).isEqualTo(1);
     }
 
     /** Starts both tasks together and returns each one's result or thrown exception. */

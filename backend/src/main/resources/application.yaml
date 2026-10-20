@@ -22,12 +22,11 @@ spring:
       use:
         header: Api-Version
 
-# Stuck detection: a run with no new letters for stuck-cycles x generator-interval
-# moves to NEEDS_ATTENTION. generator-interval must match the real letter-generator's schedule.
+# A run that isn't complete this long after it was requested shows as NEEDS_ATTENTION.
+# The completion job runs every check-interval.
 letters:
-  stuck-cycles: 3
-  generator-interval: 10s
-  stuck-check-interval: 1m
+  needs-attention-after: 4h
+  check-interval: 1m
 
 # OpenAPI document and Swagger UI: off unless a profile turns them on (dev does).
 springdoc:
