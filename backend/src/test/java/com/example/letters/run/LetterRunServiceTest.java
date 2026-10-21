@@ -41,7 +41,9 @@ class LetterRunServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-03-02T09:00:00Z");
     private static final LocalDate CLAIM_DATE = LocalDate.of(2026, 2, 1);
-    private static final LetterRunRequest REQUEST = new LetterRunRequest("LETTER_A", CLAIM_DATE);
+    private static final String PLAN = "PLAN-1A";
+    private static final LetterRunRequest REQUEST =
+            new LetterRunRequest(PLAN, "LETTER_A", CLAIM_DATE, "Annual decision letters");
 
     @Mock LetterRunRepository letterRunRepository;
     @Mock LetterRunItemRepository letterRunItemRepository;
@@ -49,6 +51,7 @@ class LetterRunServiceTest {
     @Mock LetterTypeLockRepository letterTypeLockRepository;
     @Mock LetterRequestQueueRepository letterRequestQueueRepository;
     @Mock LetterRunStatusService letterRunStatusService;
+    @Mock LetterRunCommentStore letterRunCommentStore;
 
     private final LetterType letterTypeA = new LetterType("LETTER_A", "Letter type A");
 
@@ -57,12 +60,12 @@ class LetterRunServiceTest {
     @BeforeEach
     void setUp() {
         letterRunService = new LetterRunService(letterRunRepository, letterRunItemRepository, letterTypeRepository,
-                letterTypeLockRepository, letterRequestQueueRepository, letterRunStatusService,
+                letterTypeLockRepository, letterRequestQueueRepository, letterRunStatusService, letterRunCommentStore,
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private LetterRun existingRun() {
-        LetterRun run = new LetterRun(letterTypeA, CLAIM_DATE, "admin", NOW);
+        LetterRun run = new LetterRun(PLAN, letterTypeA, CLAIM_DATE, "admin", NOW);
         run.setId(7L);
         run.setTotalRequested(3);
         return run;
@@ -83,41 +86,56 @@ class LetterRunServiceTest {
 
     // --- Generate ---
 
+    private void noUnfinishedRunsInThePlan() {
+        when(letterRunRepository.findAllByPlanIdAndLetterType_CodeAndCompletedAtIsNull(PLAN, "LETTER_A"))
+                .thenReturn(List.of());
+    }
+
     @Test
-    void generateCreatesARunWhenApplicationsAreEligible() {
+    void generateCreatesARunForThePlanAndPassesTheCommentToTheStore() {
         typeIsLocked();
-        when(letterRequestQueueRepository.countPending("LETTER_A")).thenReturn(0);
+        noUnfinishedRunsInThePlan();
         runIsSavedWithId7();
-        when(letterRunItemRepository.insertForEligibleApplications(7L, "LETTER_A")).thenReturn(3);
+        when(letterRunItemRepository.insertForEligibleApplications(7L, "LETTER_A", PLAN)).thenReturn(3);
         when(letterRunStatusService.calculate(any(LetterRun.class)))
                 .thenReturn(new LetterRunStatusService.RunProgress(0, RunStatus.QUEUED));
 
         LetterRunResponse run = letterRunService.generateLetters(REQUEST, "admin");
 
         assertThat(run.runId()).isEqualTo(7L);
+        assertThat(run.planId()).isEqualTo(PLAN);
+        assertThat(run.claimDeadlineDate()).isEqualTo(CLAIM_DATE);
         assertThat(run.totalCount()).isEqualTo(3);
         assertThat(run.status()).isEqualTo(RunStatus.QUEUED);
         assertThat(run.visibility()).isEqualTo(RunVisibility.STAFF_ONLY);
         assertThat(run.requestedBy()).isEqualTo("admin");
         verify(letterRequestQueueRepository).insertPendingForRun(7L);
+        verify(letterRunCommentStore).store(7L, "Annual decision letters", "admin");
     }
 
     @Test
     void generateRejectsAnUnknownLetterTypeBeforeAnythingElse() {
         when(letterTypeLockRepository.findWithLockByLetterType("LETTER_Z")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> letterRunService.generateLetters(new LetterRunRequest("LETTER_Z", CLAIM_DATE), "admin"))
+        assertThatThrownBy(() -> letterRunService.generateLetters(
+                new LetterRunRequest(PLAN, "LETTER_Z", CLAIM_DATE, "Test"), "admin"))
                 .isInstanceOfSatisfying(BusinessRuleException.class, e -> {
                     assertThat(e.getStatus().value()).isEqualTo(400);
                     assertThat(e.getCode()).isEqualTo("UNKNOWN_LETTER_TYPE");
                 });
-        verify(letterRequestQueueRepository, never()).countPending(anyString());
+        verify(letterRunRepository, never()).findAllByPlanIdAndLetterType_CodeAndCompletedAtIsNull(anyString(),
+                anyString());
+        verify(letterRunCommentStore, never()).store(any(), any(), any());
     }
 
     @Test
-    void generateRejectsWhileQueueRowsArePending() {
+    void generateRejectsWhenThePlanHasAnUnfinishedRunOfTheType() {
         typeIsLocked();
-        when(letterRequestQueueRepository.countPending("LETTER_A")).thenReturn(4);
+        LetterRun unfinished = existingRun();
+        when(letterRunRepository.findAllByPlanIdAndLetterType_CodeAndCompletedAtIsNull(PLAN, "LETTER_A"))
+                .thenReturn(List.of(unfinished));
+        when(letterRunStatusService.calculate(unfinished))
+                .thenReturn(new LetterRunStatusService.RunProgress(1, RunStatus.IN_PROGRESS));
 
         assertThatThrownBy(() -> letterRunService.generateLetters(REQUEST, "admin"))
                 .isInstanceOfSatisfying(BusinessRuleException.class, e -> {
@@ -125,14 +143,29 @@ class LetterRunServiceTest {
                     assertThat(e.getCode()).isEqualTo("RUN_IN_PROGRESS");
                 });
         verify(letterRunRepository, never()).saveAndFlush(any());
+        verify(letterRunCommentStore, never()).store(any(), any(), any());
+    }
+
+    @Test
+    void generateGoesAheadWhenThePlansOnlyIncompleteRunTurnsOutComplete() {
+        typeIsLocked();
+        LetterRun lastLettersJustArrived = existingRun();
+        when(letterRunRepository.findAllByPlanIdAndLetterType_CodeAndCompletedAtIsNull(PLAN, "LETTER_A"))
+                .thenReturn(List.of(lastLettersJustArrived));
+        when(letterRunStatusService.calculate(any(LetterRun.class)))
+                .thenReturn(new LetterRunStatusService.RunProgress(3, RunStatus.COMPLETE));
+        runIsSavedWithId7();
+        when(letterRunItemRepository.insertForEligibleApplications(7L, "LETTER_A", PLAN)).thenReturn(2);
+
+        assertThat(letterRunService.generateLetters(REQUEST, "admin").totalCount()).isEqualTo(2);
     }
 
     @Test
     void generateRejectsWhenNothingIsEligibleAndQueuesNothing() {
         typeIsLocked();
-        when(letterRequestQueueRepository.countPending("LETTER_A")).thenReturn(0);
+        noUnfinishedRunsInThePlan();
         runIsSavedWithId7();
-        when(letterRunItemRepository.insertForEligibleApplications(7L, "LETTER_A")).thenReturn(0);
+        when(letterRunItemRepository.insertForEligibleApplications(7L, "LETTER_A", PLAN)).thenReturn(0);
 
         assertThatThrownBy(() -> letterRunService.generateLetters(REQUEST, "admin"))
                 .isInstanceOfSatisfying(BusinessRuleException.class, e -> {
@@ -140,6 +173,7 @@ class LetterRunServiceTest {
                     assertThat(e.getCode()).isEqualTo("NO_ELIGIBLE_APPLICATIONS");
                 });
         verify(letterRequestQueueRepository, never()).insertPendingForRun(anyLong());
+        verify(letterRunCommentStore, never()).store(any(), any(), any());
     }
 
     // --- Release ---

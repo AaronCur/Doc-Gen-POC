@@ -40,8 +40,8 @@ class LetterRunStatusServiceTest {
     }
 
     private static LetterRun run(Instant requestedAt, int total) {
-        LetterRun run = new LetterRun(new LetterType("LETTER_A", "Letter type A"), LocalDate.of(2026, 2, 1), "admin",
-                requestedAt);
+        LetterRun run = new LetterRun("PLAN-1A", new LetterType("LETTER_A", "Letter type A"),
+                LocalDate.of(2026, 2, 1), "admin", requestedAt);
         run.setId(7L);
         run.setTotalRequested(total);
         return run;

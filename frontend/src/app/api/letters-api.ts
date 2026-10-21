@@ -8,6 +8,8 @@ import {
   GenerateRequest,
   LetterRun,
   LetterType,
+  Plan,
+  PlanType,
   RunPage,
 } from './models';
 
@@ -18,13 +20,25 @@ const API = '/api';
 export class LettersApi {
   private readonly http = inject(HttpClient);
 
+  /** STAND-IN for the existing admin screen's plan types. */
+  planTypes(): Observable<PlanType[]> {
+    return this.http.get<PlanType[]>(`${API}/plan-types`);
+  }
+
+  /** STAND-IN for the existing admin screen's plans. */
+  plans(planTypeId: string): Observable<Plan[]> {
+    return this.http.get<Plan[]>(`${API}/plan-types/${encodeURIComponent(planTypeId)}/plans`);
+  }
+
   letterTypes(): Observable<LetterType[]> {
     return this.http.get<LetterType[]>(`${API}/letter-types`);
   }
 
-  eligibleCount(code: string): Observable<EligibleCount> {
+  /** How many applications in the plan a run would include now. */
+  eligibleCount(code: string, planId: string): Observable<EligibleCount> {
     return this.http.get<EligibleCount>(
       `${API}/letter-types/${encodeURIComponent(code)}/eligible-count`,
+      { params: new HttpParams().set('planId', planId) },
     );
   }
 
@@ -33,8 +47,9 @@ export class LettersApi {
     return this.http.post<LetterRun>(`${API}/letter-runs`, request);
   }
 
-  listRuns(page: number, size: number): Observable<RunPage> {
-    const params = new HttpParams().set('page', page).set('size', size);
+  /** One plan's runs, newest first. */
+  listRuns(planId: string, page: number, size: number): Observable<RunPage> {
+    const params = new HttpParams().set('planId', planId).set('page', page).set('size', size);
     return this.http.get<RunPage>(`${API}/letter-runs`, { params });
   }
 

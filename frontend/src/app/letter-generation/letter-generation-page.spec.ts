@@ -8,16 +8,20 @@ import { LetterRun, RunPage } from '../api/models';
 import { LetterGenerationPage, RUNS_POLL_INTERVAL_MS } from './letter-generation-page';
 
 const POLL_MS = 1000;
-const RUNS_URL = '/api/letter-runs?page=0&size=10';
+const PLAN_A = { id: 'PLAN-1A', planTypeId: 'PT-1', name: 'Plan 1A' };
+const PLAN_B = { id: 'PLAN-1B', planTypeId: 'PT-1', name: 'Plan 1B' };
+const RUNS_URL = '/api/letter-runs?planId=PLAN-1A&page=0&size=10';
+const PLAN_B_RUNS_URL = '/api/letter-runs?planId=PLAN-1B&page=0&size=10';
 
 function page(...statuses: LetterRun['status'][]): RunPage {
   return {
     total: statuses.length,
     items: statuses.map((status, i) => ({
       runId: i + 1,
+      planId: 'PLAN-1A',
       letterType: 'LETTER_A',
       letterTypeName: 'Letter type A',
-      claimSubmittedDate: '2026-02-01',
+      claimDeadlineDate: '2026-02-01',
       status,
       visibility: 'STAFF_ONLY',
       totalCount: 10,
@@ -49,7 +53,8 @@ describe('LetterGenerationPage polling', () => {
 
     http = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(LetterGenerationPage);
-    fixture.detectChanges(); // ngOnInit
+    fixture.componentRef.setInput('plan', PLAN_A);
+    fixture.detectChanges(); // ngOnInit and the plan effect
     http.expectOne('/api/letter-types').flush([{ code: 'LETTER_A', name: 'Letter type A' }]);
   });
 
@@ -91,6 +96,25 @@ describe('LetterGenerationPage polling', () => {
     http.expectOne(RUNS_URL).flush(page('COMPLETE'));
   });
 
+  it('reloads from the first page for the new plan when the plan changes', async () => {
+    http.expectOne(RUNS_URL).flush(page('IN_PROGRESS'));
+
+    fixture.componentRef.setInput('plan', PLAN_B);
+    await fixture.whenStable();
+    http.expectOne(PLAN_B_RUNS_URL).flush(page('COMPLETE'));
+
+    // The old plan's poll was cancelled along with its runs.
+    vi.advanceTimersByTime(POLL_MS * 5);
+    http.expectNone(RUNS_URL);
+  });
+
+  it('titles the runs table with the plan name', async () => {
+    http.expectOne(RUNS_URL).flush(page('COMPLETE'));
+    await fixture.whenStable();
+
+    expect(fixture.nativeElement.textContent).toContain('Letter generation runs for Plan 1A');
+  });
+
   it('stops polling when the page is destroyed', () => {
     http.expectOne(RUNS_URL).flush(page('IN_PROGRESS'));
 
@@ -113,7 +137,8 @@ describe('LetterGenerationPage letter types', () => {
 
     http = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(LetterGenerationPage);
-    fixture.detectChanges(); // ngOnInit
+    fixture.componentRef.setInput('plan', PLAN_A);
+    fixture.detectChanges(); // ngOnInit and the plan effect
     http.expectOne(RUNS_URL).flush(page('COMPLETE'));
   });
 

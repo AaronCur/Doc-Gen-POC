@@ -2,11 +2,14 @@ package com.example.letters.run;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
+import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -40,8 +43,10 @@ public class LetterRunControllerTest {
 
     private static final String REQUEST_BODY = """
             {
+                "planId": "PLAN-1A",
                 "letterType": "LETTER_A",
-                "claimSubmittedDate": "2026-02-01"
+                "claimDeadlineDate": "2026-02-01",
+                "comment": "Annual decision letters"
             }
             """;
 
@@ -52,7 +57,7 @@ public class LetterRunControllerTest {
     private LetterRunService letterRunService;
 
     private static LetterRunResponse run(RunStatus status, RunVisibility visibility) {
-        return new LetterRunResponse(1L, "LETTER_A", "Letter type A", LocalDate.of(2026, 2, 1), status, visibility,
+        return new LetterRunResponse(1L, "PLAN-1A", "LETTER_A", "Letter type A", LocalDate.of(2026, 2, 1), status, visibility,
                 18, status == RunStatus.COMPLETE ? 18 : 0, "admin", Instant.parse("2026-03-02T09:00:00Z"),
                 visibility == RunVisibility.STAFF_AND_EXTERNAL ? "staff" : null,
                 visibility == RunVisibility.STAFF_AND_EXTERNAL ? Instant.parse("2026-03-02T10:00:00Z") : null);
@@ -62,24 +67,25 @@ public class LetterRunControllerTest {
 
     @Test
     void shouldReturnLetterRuns() throws Exception {
-        when(letterRunService.getLetterRuns(0, 20))
+        when(letterRunService.getLetterRuns("PLAN-1A", 0, 20))
                 .thenReturn(new LetterRunPageResponse(List.of(run(RunStatus.IN_PROGRESS, RunVisibility.STAFF_ONLY)), 1));
 
-        mockMvc.perform(get("/api/letter-runs").header(VERSION, "1").with(httpBasic("staff", "staff")))
+        mockMvc.perform(get("/api/letter-runs").param("planId", "PLAN-1A").header(VERSION, "1").with(httpBasic("staff", "staff")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total").value(1))
                 .andExpect(jsonPath("$.items[0].runId").value(1))
+                .andExpect(jsonPath("$.items[0].planId").value("PLAN-1A"))
                 .andExpect(jsonPath("$.items[0].letterTypeName").value("Letter type A"))
-                .andExpect(jsonPath("$.items[0].claimSubmittedDate").value("2026-02-01"))
+                .andExpect(jsonPath("$.items[0].claimDeadlineDate").value("2026-02-01"))
                 .andExpect(jsonPath("$.items[0].requestedAt").value("2026-03-02T09:00:00Z"))
                 .andExpect(jsonPath("$.items[0].status").value("IN_PROGRESS"));
     }
 
     @Test
     void shouldPassPagingToTheService() throws Exception {
-        when(letterRunService.getLetterRuns(2, 10)).thenReturn(new LetterRunPageResponse(List.of(), 25));
+        when(letterRunService.getLetterRuns("PLAN-1A", 2, 10)).thenReturn(new LetterRunPageResponse(List.of(), 25));
 
-        mockMvc.perform(get("/api/letter-runs").param("page", "2").param("size", "10").header(VERSION, "1")
+        mockMvc.perform(get("/api/letter-runs").param("planId", "PLAN-1A").param("page", "2").param("size", "10").header(VERSION, "1")
                         .with(httpBasic("admin", "admin")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.total").value(25));
@@ -119,7 +125,8 @@ public class LetterRunControllerTest {
                 .andExpect(jsonPath("$.status").value("QUEUED"))
                 .andExpect(jsonPath("$.visibility").value("STAFF_ONLY"));
 
-        verify(letterRunService).generateLetters(new LetterRunRequest("LETTER_A", LocalDate.of(2026, 2, 1)), "admin");
+        verify(letterRunService).generateLetters(
+                new LetterRunRequest("PLAN-1A", "LETTER_A", LocalDate.of(2026, 2, 1), "Annual decision letters"), "admin");
     }
 
     @Test
@@ -144,16 +151,16 @@ public class LetterRunControllerTest {
     // --- Validation errors ---
 
     @Test
-    void shouldRejectAMissingClaimSubmittedDate() throws Exception {
+    void shouldRejectAMissingClaimDeadlineDate() throws Exception {
         mockMvc.perform(post("/api/letter-runs").header(VERSION, "1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                { "letterType": "LETTER_A" }
+                                { "planId": "PLAN-1A", "letterType": "LETTER_A", "comment": "Test" }
                                 """)
                         .with(httpBasic("admin", "admin")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.errors[0]").value("claimSubmittedDate: must not be null"));
+                .andExpect(jsonPath("$.errors", hasItem("claimDeadlineDate: must not be null")));
         verifyNoInteractions(letterRunService);
     }
 
@@ -162,7 +169,7 @@ public class LetterRunControllerTest {
         mockMvc.perform(post("/api/letter-runs").header(VERSION, "1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                { "letterType": "LETTER_A", "claimSubmittedDate": "01/02/2026" }
+                                { "planId": "PLAN-1A", "letterType": "LETTER_A", "claimDeadlineDate": "01/02/2026", "comment": "Test" }
                                 """)
                         .with(httpBasic("admin", "admin")))
                 .andExpect(status().isBadRequest())
@@ -170,8 +177,70 @@ public class LetterRunControllerTest {
     }
 
     @Test
+    void shouldRejectAMissingComment() throws Exception {
+        assertValidationFails("""
+                { "planId": "PLAN-1A", "letterType": "LETTER_A", "claimDeadlineDate": "2026-02-01" }
+                """, "comment: must not be blank");
+    }
+
+    @Test
+    void shouldRejectABlankComment() throws Exception {
+        assertValidationFails("""
+                { "planId": "PLAN-1A", "letterType": "LETTER_A", "claimDeadlineDate": "2026-02-01", "comment": "   " }
+                """, "comment: must not be blank");
+    }
+
+    @Test
+    void shouldRejectA501CharacterComment() throws Exception {
+        assertValidationFails("{ \"planId\": \"PLAN-1A\", \"letterType\": \"LETTER_A\", "
+                + "\"claimDeadlineDate\": \"2026-02-01\", \"comment\": \"" + "x".repeat(501) + "\" }",
+                "comment: size must be between 0 and 500");
+    }
+
+    @Test
+    void shouldAcceptA500CharacterComment() throws Exception {
+        when(letterRunService.generateLetters(any(LetterRunRequest.class), eq("admin")))
+                .thenReturn(run(RunStatus.QUEUED, RunVisibility.STAFF_ONLY));
+
+        mockMvc.perform(post("/api/letter-runs").header(VERSION, "1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{ \"planId\": \"PLAN-1A\", \"letterType\": \"LETTER_A\", "
+                                + "\"claimDeadlineDate\": \"2026-02-01\", \"comment\": \"" + "x".repeat(500) + "\" }")
+                        .with(httpBasic("admin", "admin")))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void shouldRejectAMissingPlanIdWhenGenerating() throws Exception {
+        assertValidationFails("""
+                { "letterType": "LETTER_A", "claimDeadlineDate": "2026-02-01", "comment": "Test" }
+                """, "planId: must not be blank");
+    }
+
+    @Test
+    void shouldRequireAPlanIdToListRuns() throws Exception {
+        mockMvc.perform(get("/api/letter-runs").header(VERSION, "1").with(httpBasic("staff", "staff")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.detail").value("Required query parameter 'planId' is missing"));
+        verifyNoInteractions(letterRunService);
+    }
+
+    /** Posts the body and expects 400 VALIDATION_FAILED listing the given error; the service is never called. */
+    private void assertValidationFails(String body, String expectedError) throws Exception {
+        mockMvc.perform(post("/api/letter-runs").header(VERSION, "1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body)
+                        .with(httpBasic("admin", "admin")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.errors", hasItem(expectedError)));
+        verifyNoInteractions(letterRunService);
+    }
+
+    @Test
     void shouldRejectAnOutOfRangePageSize() throws Exception {
-        mockMvc.perform(get("/api/letter-runs").param("size", "500").header(VERSION, "1")
+        mockMvc.perform(get("/api/letter-runs").param("planId", "PLAN-1A").param("size", "500").header(VERSION, "1")
                         .with(httpBasic("admin", "admin")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
@@ -179,16 +248,16 @@ public class LetterRunControllerTest {
 
     @Test
     void shouldRejectAnUnsupportedApiVersion() throws Exception {
-        mockMvc.perform(get("/api/letter-runs").header(VERSION, "2").with(httpBasic("admin", "admin")))
+        mockMvc.perform(get("/api/letter-runs").param("planId", "PLAN-1A").header(VERSION, "2").with(httpBasic("admin", "admin")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("BAD_REQUEST"));
     }
 
     @Test
     void shouldDefaultToVersion1WithoutTheHeader() throws Exception {
-        when(letterRunService.getLetterRuns(anyInt(), anyInt())).thenReturn(new LetterRunPageResponse(List.of(), 0));
+        when(letterRunService.getLetterRuns(anyString(), anyInt(), anyInt())).thenReturn(new LetterRunPageResponse(List.of(), 0));
 
-        mockMvc.perform(get("/api/letter-runs").with(httpBasic("admin", "admin")))
+        mockMvc.perform(get("/api/letter-runs").param("planId", "PLAN-1A").with(httpBasic("admin", "admin")))
                 .andExpect(status().isOk());
     }
 
@@ -289,7 +358,7 @@ public class LetterRunControllerTest {
 
     @Test
     void externalCannotListRuns() throws Exception {
-        mockMvc.perform(get("/api/letter-runs").header(VERSION, "1").with(httpBasic("external", "external")))
+        mockMvc.perform(get("/api/letter-runs").param("planId", "PLAN-1A").header(VERSION, "1").with(httpBasic("external", "external")))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(letterRunService);
     }
@@ -340,7 +409,7 @@ public class LetterRunControllerTest {
 
     @Test
     void wrongPasswordIsRejected() throws Exception {
-        mockMvc.perform(get("/api/letter-runs").header(VERSION, "1").with(httpBasic("admin", "wrong")))
+        mockMvc.perform(get("/api/letter-runs").param("planId", "PLAN-1A").header(VERSION, "1").with(httpBasic("admin", "wrong")))
                 .andExpect(status().isUnauthorized());
     }
 

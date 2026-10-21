@@ -22,15 +22,6 @@ public class LetterRequestQueueRepository {
         this.jdbc = jdbc;
     }
 
-    /** Rows for the type that the letter-generator has not processed yet, from any source. */
-    public int countPending(String letterType) {
-        Integer count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM letter_request_queue WHERE letter_type = :letterType AND generated_flag = 'N'",
-                Map.of("letterType", letterType),
-                Integer.class);
-        return count == null ? 0 : count;
-    }
-
     /**
      * Queues one request per run item. The run items are the source of truth for membership; the
      * queue key ({@code appid_lettertype}) is built here rather than stored on the item. Nested

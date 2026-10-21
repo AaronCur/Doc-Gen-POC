@@ -52,21 +52,33 @@ public class LetterTypeControllerTest {
 
     @Test
     void shouldReturnEligibleCount() throws Exception {
-        when(letterTypeService.getEligibleCount("LETTER_A")).thenReturn(new EligibleCountResponse("LETTER_A", 18));
+        when(letterTypeService.getEligibleCount("LETTER_A", "PLAN-1A"))
+                .thenReturn(new EligibleCountResponse("LETTER_A", "PLAN-1A", 18));
 
-        mockMvc.perform(get("/api/letter-types/LETTER_A/eligible-count").header(VERSION, "1")
+        mockMvc.perform(get("/api/letter-types/LETTER_A/eligible-count").param("planId", "PLAN-1A").header(VERSION, "1")
                         .with(httpBasic("admin", "admin")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("LETTER_A"))
+                .andExpect(jsonPath("$.planId").value("PLAN-1A"))
                 .andExpect(jsonPath("$.eligibleCount").value(18));
     }
 
     @Test
+    void shouldRequireAPlanIdForTheEligibleCount() throws Exception {
+        mockMvc.perform(get("/api/letter-types/LETTER_A/eligible-count").header(VERSION, "1")
+                        .with(httpBasic("admin", "admin")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.detail").value("Required query parameter 'planId' is missing"));
+        verifyNoInteractions(letterTypeService);
+    }
+
+    @Test
     void shouldReturn404ForAnUnknownLetterType() throws Exception {
-        when(letterTypeService.getEligibleCount("LETTER_Z"))
+        when(letterTypeService.getEligibleCount("LETTER_Z", "PLAN-1A"))
                 .thenThrow(new EntityNotFoundException("Letter type not found with code: LETTER_Z"));
 
-        mockMvc.perform(get("/api/letter-types/LETTER_Z/eligible-count").header(VERSION, "1")
+        mockMvc.perform(get("/api/letter-types/LETTER_Z/eligible-count").param("planId", "PLAN-1A").header(VERSION, "1")
                         .with(httpBasic("admin", "admin")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"))
@@ -84,7 +96,7 @@ public class LetterTypeControllerTest {
 
     @Test
     void staffCannotGetEligibleCount() throws Exception {
-        mockMvc.perform(get("/api/letter-types/LETTER_A/eligible-count").header(VERSION, "1")
+        mockMvc.perform(get("/api/letter-types/LETTER_A/eligible-count").param("planId", "PLAN-1A").header(VERSION, "1")
                         .with(httpBasic("staff", "staff")))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(letterTypeService);
@@ -92,7 +104,7 @@ public class LetterTypeControllerTest {
 
     @Test
     void externalCannotGetEligibleCount() throws Exception {
-        mockMvc.perform(get("/api/letter-types/LETTER_A/eligible-count").header(VERSION, "1")
+        mockMvc.perform(get("/api/letter-types/LETTER_A/eligible-count").param("planId", "PLAN-1A").header(VERSION, "1")
                         .with(httpBasic("external", "external")))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(letterTypeService);

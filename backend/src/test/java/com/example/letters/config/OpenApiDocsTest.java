@@ -26,6 +26,8 @@ class OpenApiDocsTest extends IntegrationTest {
         mvc.perform(get("/v3/api-docs"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.info.title").value("case-service: letter generation"))
+                .andExpect(jsonPath("$.paths['/api/plan-types'].get").exists())
+                .andExpect(jsonPath("$.paths['/api/plan-types/{id}/plans'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/letter-types'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/letter-types/{code}/eligible-count'].get").exists())
                 .andExpect(jsonPath("$.paths['/api/letter-runs'].get").exists())

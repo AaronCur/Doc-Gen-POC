@@ -13,8 +13,8 @@ import { LetterRun } from '../api/models';
     <h2 mat-dialog-title>Enable for external users?</h2>
     <mat-dialog-content>
       <p>
-        {{ run.totalCount }} letters of <strong>{{ run.letterTypeName }}</strong> (claim submitted date
-        {{ run.claimSubmittedDate | date: 'dd/MM/yyyy' }}) will become visible to external users.
+        {{ run.totalCount }} letters of <strong>{{ run.letterTypeName }}</strong> (deadline for claim submission
+        {{ run.claimDeadlineDate | date: 'dd/MM/yyyy' }}) will become visible to external users.
       </p>
       <p>This can't be undone from this screen. Your name and the time are recorded.</p>
     </mat-dialog-content>

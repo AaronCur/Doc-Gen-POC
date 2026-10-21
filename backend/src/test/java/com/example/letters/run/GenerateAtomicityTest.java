@@ -29,7 +29,7 @@ class GenerateAtomicityTest extends IntegrationTest {
         doThrow(new DataAccessResourceFailureException("simulated"))
                 .when(queue).insertPendingForRun(anyLong());
 
-        assertThatThrownBy(() -> service.generateLetters(new LetterRunRequest("LETTER_A", LocalDate.of(2026, 2, 1)), "admin"))
+        assertThatThrownBy(() -> service.generateLetters(new LetterRunRequest(PLAN, "LETTER_A", LocalDate.of(2026, 2, 1), "Test run"), "admin"))
                 .isInstanceOf(DataAccessResourceFailureException.class);
 
         assertThat(count("SELECT COUNT(*) FROM letter_run")).isZero();

@@ -24,11 +24,12 @@ public class LetterTypeService {
         return letterTypeRepository.findAllByOrderByCodeAsc().stream().map(this::mapToResponse).toList();
     }
 
-    /** How many applications a run would pick up now; the same rule the generate flow uses. */
-    public EligibleCountResponse getEligibleCount(String code) {
+    /** How many applications in the plan a run would pick up now; the same rule Generate uses. */
+    public EligibleCountResponse getEligibleCount(String code, String planId) {
         LetterType letterType = letterTypeRepository.findById(code)
                 .orElseThrow(() -> new EntityNotFoundException("Letter type not found with code: " + code));
-        return new EligibleCountResponse(letterType.getCode(), eligibilityRepository.countEligible(code));
+        return new EligibleCountResponse(letterType.getCode(), planId,
+                eligibilityRepository.countEligible(code, planId));
     }
 
     private LetterTypeResponse mapToResponse(LetterType letterType) {

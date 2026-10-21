@@ -30,7 +30,8 @@ class EndToEndGenerationTest extends IntegrationTest {
         }
         var generator = new SimulatedLetterGenerator(jdbc, transactions, clock,
                 new SimulatedGeneratorProperties(Duration.ofSeconds(10), 5, List.of()));
-        long runId = service.generateLetters(new LetterRunRequest("LETTER_A", LocalDate.of(2026, 2, 1)), "admin")
+        long runId = service.generateLetters(
+                new LetterRunRequest(PLAN, "LETTER_A", LocalDate.of(2026, 2, 1), "Test run"), "admin")
                 .runId();
         assertThat(listedRun(runId).status()).isEqualTo(RunStatus.QUEUED);
 
@@ -47,6 +48,7 @@ class EndToEndGenerationTest extends IntegrationTest {
     }
 
     private LetterRunResponse listedRun(long runId) {
-        return service.getLetterRuns(0, 20).items().stream().filter(r -> r.runId() == runId).findFirst().orElseThrow();
+        return service.getLetterRuns(PLAN, 0, 20).items().stream()
+                .filter(r -> r.runId() == runId).findFirst().orElseThrow();
     }
 }

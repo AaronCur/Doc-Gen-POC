@@ -1,4 +1,15 @@
-import { Component, computed, DestroyRef, inject, InjectionToken, OnInit, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  DestroyRef,
+  effect,
+  inject,
+  InjectionToken,
+  input,
+  OnInit,
+  signal,
+  untracked,
+} from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -7,7 +18,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { Subscription } from 'rxjs';
 
 import { LettersApi } from '../api/letters-api';
-import { isActive, LetterRun, LetterType } from '../api/models';
+import { isActive, LetterRun, LetterType, Plan } from '../api/models';
 import { problemMessage, toProblem } from '../api/problem';
 import { DevUser } from '../auth/dev-user';
 import { EnableDialog } from './enable-dialog';
@@ -19,6 +30,10 @@ export const RUNS_POLL_INTERVAL_MS = new InjectionToken<number>('RUNS_POLL_INTER
   factory: () => 15_000,
 });
 
+/**
+ * The "Generate decision letter" section of the admin screen, for one plan: the Generate card
+ * (admins) and that plan's runs table.
+ */
 @Component({
   selector: 'app-letter-generation-page',
   imports: [MatCardModule, MatIconModule, GenerateCard, RunsTable],
@@ -32,6 +47,9 @@ export class LetterGenerationPage implements OnInit {
   private readonly pollIntervalMs = inject(RUNS_POLL_INTERVAL_MS);
   protected readonly devUser = inject(DevUser);
 
+  /** The plan chosen in "Select an action". Changing it reloads the runs. */
+  readonly plan = input.required<Plan>();
+
   protected readonly letterTypes = signal<LetterType[]>([]);
   /** Shown in the generate card with a retry; only admins use the letter types. */
   protected readonly letterTypesError = signal<string | null>(null);
@@ -41,8 +59,8 @@ export class LetterGenerationPage implements OnInit {
   protected readonly pageSize = signal(10);
 
   /**
-   * Types with an active run among the loaded runs. Active runs are the newest, so they are on
-   * the first page in practice; case-service enforces the rule regardless (409 RUN_IN_PROGRESS).
+   * Types with an active run among the plan's loaded runs. Active runs are the newest, so they are
+   * on the first page in practice; case-service enforces the rule regardless (409 RUN_IN_PROGRESS).
    */
   protected readonly activeLetterTypes = computed(
     () => new Set(this.runs().filter(isActive).map((run) => run.letterType)),
@@ -55,6 +73,15 @@ export class LetterGenerationPage implements OnInit {
   private destroyed = false;
 
   constructor() {
+    // Load the runs for the plan, and again from page 1 whenever the plan changes.
+    effect(() => {
+      this.plan();
+      untracked(() => {
+        this.pageIndex.set(0);
+        this.loadRuns();
+      });
+    });
+
     inject(DestroyRef).onDestroy(() => {
       this.destroyed = true;
       this.stopPolling();
@@ -64,7 +91,6 @@ export class LetterGenerationPage implements OnInit {
 
   ngOnInit(): void {
     this.loadLetterTypes();
-    this.loadRuns();
   }
 
   protected loadLetterTypes(): void {
@@ -113,7 +139,7 @@ export class LetterGenerationPage implements OnInit {
   private loadRuns(): void {
     this.stopPolling();
     this.loading?.unsubscribe();
-    this.loading = this.api.listRuns(this.pageIndex(), this.pageSize()).subscribe({
+    this.loading = this.api.listRuns(this.plan().id, this.pageIndex(), this.pageSize()).subscribe({
       next: (page) => {
         this.runs.set(page.items);
         this.total.set(page.total);

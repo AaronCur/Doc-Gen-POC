@@ -33,8 +33,8 @@ class GenerateConcurrencyTest extends IntegrationTest {
         }
 
         List<Object> outcomes = runConcurrently(
-                () -> service.generateLetters(new LetterRunRequest(TYPE, CLAIM_DATE), "admin"),
-                () -> service.generateLetters(new LetterRunRequest(TYPE, CLAIM_DATE), "admin"));
+                () -> service.generateLetters(new LetterRunRequest(PLAN, TYPE, CLAIM_DATE, "Test run"), "admin"),
+                () -> service.generateLetters(new LetterRunRequest(PLAN, TYPE, CLAIM_DATE, "Test run"), "admin"));
 
         assertThat(outcomes).filteredOn(o -> o instanceof LetterRunResponse).hasSize(1);
         assertThat(outcomes).filteredOn(o -> o instanceof BusinessRuleException e && e.getCode().equals("RUN_IN_PROGRESS"))
@@ -49,6 +49,21 @@ class GenerateConcurrencyTest extends IntegrationTest {
                   GROUP BY queue_key HAVING COUNT(*) > 1
                 ) duplicates
                 """)).isZero();
+    }
+
+    @RepeatedTest(5)
+    void theSameTypeInTwoPlansAtOnceProducesOneRunPerPlan() throws Exception {
+        // The type lock is shared across plans, so these run one after the other, but neither blocks.
+        data.eligibleApplicationInPlan("PLAN-A", "APP-1", TYPE);
+        data.eligibleApplicationInPlan("PLAN-B", "APP-2", TYPE);
+
+        List<Object> outcomes = runConcurrently(
+                () -> service.generateLetters(new LetterRunRequest("PLAN-A", TYPE, CLAIM_DATE, "Test run"), "admin"),
+                () -> service.generateLetters(new LetterRunRequest("PLAN-B", TYPE, CLAIM_DATE, "Test run"), "admin"));
+
+        assertThat(outcomes).allMatch(o -> o instanceof LetterRunResponse);
+        assertThat(count("SELECT COUNT(*) FROM letter_run")).isEqualTo(2);
+        assertThat(count("SELECT COUNT(DISTINCT plan_id) FROM letter_run")).isEqualTo(2);
     }
 
     /** Starts both tasks together and returns each one's result or thrown exception. */

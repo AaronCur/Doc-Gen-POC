@@ -19,6 +19,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 
 /** Roles for these endpoints are declared in SecurityConfig. */
 @RestController
@@ -33,11 +34,12 @@ public class LetterRunController {
     }
 
     @GetMapping(version = "1")
-    @Operation(summary = "List runs, newest first (ADMIN, STAFF)")
+    @Operation(summary = "List one plan's runs, newest first (ADMIN, STAFF)", description = "planId is required.")
     public ResponseEntity<LetterRunPageResponse> getLetterRuns(
+            @RequestParam @NotBlank String planId,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
-        return ResponseEntity.ok(letterRunService.getLetterRuns(page, size));
+        return ResponseEntity.ok(letterRunService.getLetterRuns(planId, page, size));
     }
 
     @GetMapping(value = "/{id}", version = "1")
@@ -54,8 +56,9 @@ public class LetterRunController {
 
     @PostMapping(version = "1")
     @Operation(summary = "Generate letters for a letter type (ADMIN)",
-            description = "201 with Location. Errors: 409 RUN_IN_PROGRESS, 422 NO_ELIGIBLE_APPLICATIONS, "
-                    + "400 UNKNOWN_LETTER_TYPE / VALIDATION_FAILED.")
+            description = "All four fields are required; comment is 1 to 500 characters. 201 with Location. "
+                    + "Errors: 409 RUN_IN_PROGRESS (this plan has an unfinished run of the type), "
+                    + "422 NO_ELIGIBLE_APPLICATIONS, 400 UNKNOWN_LETTER_TYPE / VALIDATION_FAILED.")
     public ResponseEntity<LetterRunResponse> generateLetters(@Valid @RequestBody LetterRunRequest letterRunRequest,
             @Parameter(hidden = true) Principal principal) {
         LetterRunResponse newRun = letterRunService.generateLetters(letterRunRequest, principal.getName());

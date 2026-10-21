@@ -37,19 +37,6 @@
         }
       </mat-form-field>
 
-      <mat-form-field appearance="outline">
-        <mat-label>Claim submitted date</mat-label>
-        <input matInput [matDatepicker]="picker" formControlName="claimSubmittedDate" required />
-        <mat-datepicker-toggle matIconSuffix [for]="picker" />
-        <mat-datepicker #picker />
-        <mat-hint>Recorded against each application in this run.</mat-hint>
-        @if (form.controls.claimSubmittedDate.hasError('matDatepickerParse')) {
-          <mat-error>Enter a valid date.</mat-error>
-        } @else if (form.controls.claimSubmittedDate.hasError('required')) {
-          <mat-error>Enter the claim submitted date.</mat-error>
-        }
-      </mat-form-field>
-
       <div class="actions">
         @if (countError()) {
           <button mat-button type="button" (click)="retryEligibleCount()">Retry check</button>

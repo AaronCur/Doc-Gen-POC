@@ -1,10 +1,24 @@
 -- Stand-ins for tables that already exist in the real system.
 -- Keep them minimal: only the columns this feature reads or writes.
 
--- Stand-in for the application table
+-- Stand-ins for the existing admin screen's plan types and plans. In the real system these
+-- come from the existing admin screen; the POC only needs an id and a name.
+CREATE TABLE plan_type (
+  plan_type_id  VARCHAR(40)  PRIMARY KEY,
+  name          VARCHAR(100) NOT NULL
+);
+
+CREATE TABLE plan (
+  plan_id       VARCHAR(40)  PRIMARY KEY,
+  plan_type_id  VARCHAR(40)  NOT NULL REFERENCES plan_type(plan_type_id),
+  name          VARCHAR(100) NOT NULL
+);
+
+-- Stand-in for the application table. Each application belongs to exactly one plan.
 CREATE TABLE case_applications (
   app_id      VARCHAR(40) PRIMARY KEY,
-  status      VARCHAR(20) NOT NULL
+  status      VARCHAR(20) NOT NULL,
+  plan_id     VARCHAR(40) NOT NULL
 );
 
 -- Stand-in for the existing letter / document type reference data.

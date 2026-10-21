@@ -1,5 +1,6 @@
 @if (devUser.isAdmin()) {
   <app-generate-card
+    [planId]="plan().id"
     [letterTypes]="letterTypes()"
     [activeLetterTypes]="activeLetterTypes()"
     [letterTypesWithRuns]="letterTypesWithRuns()"
@@ -18,7 +19,7 @@
 
 <mat-card>
   <mat-card-header class="runs-header">
-    <h2 mat-card-title>Letter generation runs</h2>
+    <h2 mat-card-title>Letter generation runs for {{ plan().name }}</h2>
     <span class="refresh-note">Progress refreshes automatically</span>
   </mat-card-header>
   <mat-card-content>

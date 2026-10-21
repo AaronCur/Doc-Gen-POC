@@ -10,6 +10,9 @@ public class TestData {
 
     private static final Timestamp CREATED = Timestamp.valueOf(LocalDateTime.of(2026, 1, 15, 9, 0));
 
+    /** The plan applications go into unless a test says otherwise. */
+    public static final String PLAN = "PLAN-T1";
+
     private final JdbcTemplate jdbc;
 
     public TestData(JdbcTemplate jdbc) {
@@ -26,9 +29,15 @@ public class TestData {
         jdbc.update("DELETE FROM case_applications");
     }
 
-    /** Creates the application and makes it eligible for each given letter type. */
+    /** Creates the application in {@link #PLAN} and makes it eligible for each given letter type. */
     public void eligibleApplication(String appId, String... letterTypes) {
-        jdbc.update("INSERT INTO case_applications (app_id, status) VALUES (?, 'SUBMITTED')", appId);
+        eligibleApplicationInPlan(PLAN, appId, letterTypes);
+    }
+
+    /** Creates the application in the given plan and makes it eligible for each given letter type. */
+    public void eligibleApplicationInPlan(String planId, String appId, String... letterTypes) {
+        jdbc.update("INSERT INTO case_applications (app_id, status, plan_id) VALUES (?, 'SUBMITTED', ?)", appId,
+                planId);
         for (String letterType : letterTypes) {
             jdbc.update(
                     "INSERT INTO application_letter_eligibility (app_id, letter_type) VALUES (?, ?)",

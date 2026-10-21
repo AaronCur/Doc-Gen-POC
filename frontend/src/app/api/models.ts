@@ -5,8 +5,21 @@ export interface LetterType {
   name: string;
 }
 
+/** STAND-IN: in the real system plan types and plans come from the existing admin screen. */
+export interface PlanType {
+  id: string;
+  name: string;
+}
+
+export interface Plan {
+  id: string;
+  planTypeId: string;
+  name: string;
+}
+
 export interface EligibleCount {
   code: string;
+  planId: string;
   eligibleCount: number;
 }
 
@@ -16,10 +29,11 @@ export type RunVisibility = 'STAFF_ONLY' | 'STAFF_AND_EXTERNAL';
 
 export interface LetterRun {
   runId: number;
+  planId: string;
   letterType: string;
   letterTypeName: string;
-  /** ISO date, e.g. 2026-02-01 */
-  claimSubmittedDate: string;
+  /** Deadline for claim submission. ISO date, e.g. 2026-02-01 */
+  claimDeadlineDate: string;
   status: RunStatus;
   visibility: RunVisibility;
   totalCount: number;
@@ -37,8 +51,12 @@ export interface RunPage {
 }
 
 export interface GenerateRequest {
+  planId: string;
   letterType: string;
-  claimSubmittedDate: string;
+  /** ISO date */
+  claimDeadlineDate: string;
+  /** Required, 1 to 500 characters. Passed to the comment store; not returned in run responses. */
+  comment: string;
 }
 
 export interface CaseDocument {

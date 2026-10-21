@@ -2,6 +2,8 @@
 
 A reference proof of concept for admin-driven letter generation with a staged reveal: new letters are visible to staff only until a staff user enables the run for external users.
 
+Letter generation is one action on the admin screen. The admin picks a plan type, a plan and the action "Generate decision letter", and every run belongs to that plan.
+
 - `backend/`: case-service (Spring Boot, Maven). Includes a simulated letter-generator that runs in the dev profile only.
 - `frontend/`: Angular + Angular Material.
 
@@ -43,13 +45,13 @@ Open http://localhost:4200. Every backend endpoint is under `/api`, and the dev-
 
 **API versioning.** Every endpoint is versioned with Spring Framework 7 API versioning (`@GetMapping(version = "1")` etc.), read from the `Api-Version` header (`spring.mvc.apiversion` in `application.yaml`). Version 1 is the default, so requests without the header work. An unsupported version returns `400`.
 
-**Tests.** Backend (146 tests, about 30s), from `backend/`:
+**Tests.** Backend (173 tests, about 30s), from `backend/`:
 
 ```bash
 ./mvnw test
 ```
 
-Frontend (34 component tests), from `frontend/`:
+Frontend (51 component tests), from `frontend/`:
 
 ```bash
 npm test
@@ -73,10 +75,13 @@ backend/src/main/java/com/example/letters/
   lettertype/          LetterType, LetterTypeLock entities; LetterTypeRepository, LetterTypeLockRepository;
                        LetterTypeService, LetterTypeController; LetterTypeResponse, EligibleCountResponse
   eligibility/         ApplicationLetterEligibility entity; ApplicationLetterEligibilityRepository
-                       (the one eligibility rule, native SQL)
+                       (the one eligibility rule, native SQL, per plan)
+  plan/                STAND-IN: PlanType, Plan entities and repositories; PlanService,
+                       PlanController (GET /api/plan-types, /api/plan-types/{id}/plans)
   run/                 LetterRun, LetterRunItem entities and repositories;
                        LetterRequestQueueRepository (JdbcTemplate: the shared queue has no PK);
                        LetterRunService, LetterRunStatusService (calculated status),
+                       LetterRunCommentStore (+ LoggingLetterRunCommentStore, POC only),
                        LetterRunCompletionJob, LetterRunController;
                        LetterRunRequest, LetterRunResponse, LetterRunPageResponse, LetterRunPendingResponse
   document/            CaseDocument entity, CaseDocumentRepository, DocumentVisibilityPolicy,
@@ -93,7 +98,9 @@ backend/src/main/resources/
 frontend/src/app/
   api/                 models, LettersApi (HttpClient), ProblemDetail -> message
   auth/                POC ONLY: DevUser switcher + Basic-auth interceptor
-  letter-generation/   page (polling), generate card + dialog, runs table, enable dialog,
+  admin/               admin page, "Select an action" card (plan type → plan → action),
+                       the fixed action list (STAND-IN for the real admin screen's)
+  letter-generation/   section for one plan: page (polling), generate card + dialog, runs table, enable dialog,
                        UK (dd/mm/yyyy) date adapter
   external-view/       external user's document list
 frontend/src/_theme-colors.scss   M3 palettes generated from the UX mockup's colours
@@ -110,9 +117,12 @@ frontend/src/_theme-colors.scss   M3 palettes generated from the UX mockup's col
   - the green "complete" progress bar
 - **Dates** are shown and typed as dd/mm/yyyy, as in the mockup. `NativeDateAdapter` parses typed text with `Date.parse`, which reads 01/10/2026 as 10 January, so a small `UkNativeDateAdapter` parses day-first (with tests). A real build might use a date-fns or Luxon adapter instead.
 - **Statuses** are calculated by the backend and shown as Queued, In progress, Complete and Needs attention. Enable stays disabled until a run is Complete. Its hint reads "Available when generation completes" for a Queued or In progress run, and "Generation stalled; contact support" for one that needs attention.
-- **Generate:** the card disables Generate until both fields are set, while the eligible count is 0, or while the type has any Queued, In progress or Needs attention run. Each of these shows a `mat-error`.
+- **Select an action:** three cascading `mat-select`s (Plan type, Plan, Action). Each is disabled until the one before it is chosen, and changing one clears everything after it, including the chosen letter type. Plan types and plans come from the stand-in endpoints; the action list is fixed in `admin-actions.ts` ("Generate decision letter" plus two placeholders). With no action chosen the page asks for one; any other action shows a placeholder.
+- **Generate:** the card has only the letter type. It disables Generate while the eligible count (for the selected plan) is 0, or while the type has a Queued, In progress or Needs attention run among the selected plan's runs. Each of these shows a `mat-error`.
+- **Generate popup:** a summary (letter type, new applications, "Initial visibility: Staff only"), then **Deadline for claim submission** (`mat-datepicker`) and **Comment** (textarea, 500 characters with a counter). Both are required and start empty every time the popup opens; a comment of only spaces counts as empty, and it is trimmed before sending. The comment isn't shown anywhere afterwards.
+- **Runs table** is titled "Letter generation runs for <plan name>" and reloads from page 1 when the plan changes.
 - **No idempotency key.** The confirmation dialog does the POST itself and disables its buttons while the request is in flight. On a network error or 5xx it stays open with Retry. If the first attempt did reach the server, the retry gets `409 RUN_IN_PROGRESS` rather than creating a second run. A 409 or 422 closes the dialog with a snackbar message.
-- **Polling:** `GET /api/letter-runs` is polled every `RUNS_POLL_INTERVAL_MS` (15s, an injection token) while any loaded run is Queued, In progress or Needs attention. Polling stops when none are, and when the page is destroyed.
+- **Polling:** `GET /api/letter-runs?planId=…` is polled every `RUNS_POLL_INTERVAL_MS` (15s, an injection token) while any loaded run is Queued, In progress or Needs attention. Polling stops when none are, and when the page is destroyed.
 - **Roles in the UI** (the Generate card for ADMIN, Enable for STAFF, routes) are only presentation. The server checks every call.
 
 ### Where the UI differs from the UX mockup
@@ -132,17 +142,23 @@ The layout, copy, colours, chips, hints, dialogs and snackbar messages follow th
 
 Schema migrations live in `backend/src/main/resources/db/migration`. The dev profile adds `db/seed-dev` (`V100__dev_seed.sql`). Letter types and their `letter_type_lock` rows are in the main migrations because the lock rows must exist in every environment.
 
-There are 60 applications, `APP-0001` to `APP-0060`.
+There are 60 applications, `APP-0001` to `APP-0060`, spread across three stand-in plans (dev only):
 
-| Type | Eligible apps | Eligible now | Notes |
+| Plan type | Plan | Applications |
+|---|---|---|
+| `PT-1` [Plan type 1] | `PLAN-1A` [Plan 1A] | 1–20 |
+| `PT-1` [Plan type 1] | `PLAN-1B` [Plan 1B] | 21–40 |
+| `PT-2` [Plan type 2] | `PLAN-2A` [Plan 2A] | 41–60 |
+
+| Type | Eligible apps | Eligible now (1A / 1B / 2A) | Notes |
 |---|---|---|---|
-| LETTER_A | 1–20 | 18 | APP-0001 and APP-0002 already have a letter |
-| LETTER_B | 11–35 | 25 | |
-| LETTER_C | 30–60 | 30 | APP-0030 already has a letter |
-| LETTER_D | every 3rd | 20 | |
-| LETTER_E | 41–45 | 5 | APP-0043 always fails in the simulated generator (stuck demo) |
+| LETTER_A | 1–20 | 18 / 0 / 0 | APP-0001 and APP-0002 already have a letter |
+| LETTER_B | 11–35 | 10 / 15 / 0 | |
+| LETTER_C | 30–60 | 0 / 10 / 20 | APP-0030 already has a letter |
+| LETTER_D | every 3rd | 6 / 7 / 7 | |
+| LETTER_E | 41–45 | 0 / 0 / 5 | APP-0043 always fails in the simulated generator (stuck demo) |
 | LETTER_F, LETTER_G | none | 0 | |
-| LETTER_H | 50–60 | 11 | |
+| LETTER_H | 50–60 | 0 / 0 / 11 | |
 | LETTER_I | 1–3 | 0 | All three already have a letter |
 
 The six existing letters (`DOC-EXISTING-*`) have no run item, so they stay visible to external users.
@@ -153,9 +169,11 @@ There are three new tables, all owned by case-service. The existing tables don't
 
 | Table | Columns | Notes |
 |---|---|---|
-| `letter_run` | `run_id` (PK, generated), `letter_type`, `claim_submitted_date`, `visibility`, `total_requested`, `requested_by`, `requested_at`, `completed_at`, `released_by`, `released_at` | One row per Generate click. `total_requested` is set once at Generate. `completed_at` is set the first time every item has a document. Release changes only `visibility`, `released_by` and `released_at` |
+| `letter_run` | `run_id` (PK, generated), `plan_id` (NOT NULL), `letter_type`, `claim_deadline_date`, `visibility`, `total_requested`, `requested_by`, `requested_at`, `completed_at`, `released_by`, `released_at`; index `(plan_id, letter_type)` | One row per Generate click, for one plan. `total_requested` is set once at Generate. `completed_at` is set the first time every item has a document. Release changes only `visibility`, `released_by` and `released_at` |
 | `letter_run_item` | `run_id`, `app_id`, `letter_type`; PK `(run_id, app_id)`; index `(app_id, letter_type, run_id)` | One row per application in a run. `letter_type` is copied from the run, so the visibility check needs no join |
-| `letter_type_lock` | `letter_type` (PK) | One row per letter type, locked with `SELECT … FOR UPDATE` during Generate and never updated. Add a row in the migration that introduces a new letter type |
+| `letter_type_lock` | `letter_type` (PK) | One row per letter type (across all plans), locked with `SELECT … FOR UPDATE` during Generate and never updated. Add a row in the migration that introduces a new letter type |
+
+`letter_run_item` and `letter_type_lock` don't change for plans. `plan_id` is a logical link: the stand-in `plan_type` / `plan` tables and the `plan_id` on the application stub stand for the existing system's, so there are no foreign keys to them.
 
 **How they link:**
 - run → items by `run_id`.
@@ -169,6 +187,7 @@ There are three new tables, all owned by case-service. The existing tables don't
 - the queue key on the item: built in the queue insert
 - an idempotency key: the type lock plus the pending check already prevent duplicates
 - an audit table: who generated and who released are on the run
+- the Generate comment: it goes to `LetterRunCommentStore` (see "Generate: one transaction")
 
 The POC edits the V1/V2 migrations in place, because its database is in memory and rebuilt on every start. A real deployment would add new migrations instead.
 
@@ -178,8 +197,8 @@ The backend has three kinds of test, following the Places Been API conventions:
 
 | Kind | Classes | What they cover |
 |---|---|---|
-| `@WebMvcTest` + `@MockitoBean` (like `CityControllerTest`) | `LetterRunControllerTest`, `LetterTypeControllerTest`, `DocumentControllerTest` | Each endpoint's happy path, validation errors, 404/409/422 ProblemDetails, API versioning, and a wrong-role test for every endpoint, with the real `SecurityConfig` imported |
-| Plain unit tests (Mockito) | `LetterRunServiceTest`, `LetterRunStatusServiceTest`, `LetterTypeServiceTest` | Service branching: the order of the generate checks, the release rules, and the order of the status rules |
+| `@WebMvcTest` + `@MockitoBean` (like `CityControllerTest`) | `LetterRunControllerTest`, `LetterTypeControllerTest`, `PlanControllerTest`, `DocumentControllerTest` | Each endpoint's happy path, validation errors, 404/409/422 ProblemDetails, API versioning, and a wrong-role test for every endpoint, with the real `SecurityConfig` imported |
+| Plain unit tests (Mockito) | `LetterRunServiceTest`, `LetterRunStatusServiceTest`, `LetterTypeServiceTest`, `PlanServiceTest` | Service branching: the order of the generate checks, the release rules, and the order of the status rules |
 | `@SpringBootTest` against H2 and Flyway | `GenerateTest`, `GenerateConcurrencyTest`, `GenerateAtomicityTest`, `RunStatusTest`, `LetterRunCompletionJobTest`, `ReleaseTest`, `DocumentVisibilityTest`, `ApplicationLetterEligibilityRepositoryTest`, … | Everything that depends on the database: the eligibility SQL, the per-type lock, rollback, calculated status, the completion job, the guarded release, and the visibility SQL through the real external endpoints |
 
 The integration tests stay because mocks can't prove the locking, the transaction or the SQL. Two checks show they bite: removing the type lock makes every `GenerateConcurrencyTest` run fail, and replacing the visibility condition with "always visible" fails 6 `DocumentVisibilityTest` cases.
@@ -200,11 +219,11 @@ Errors are RFC 9457 `ProblemDetail` responses (`application/problem+json`) with 
 
 | Status | `code` | When |
 |---|---|---|
-| 400 | `VALIDATION_FAILED` | A body field or `page`/`size` is invalid. `errors` lists them |
+| 400 | `VALIDATION_FAILED` | A body field or `page`/`size` is invalid, including a missing, blank or over-500-character `comment` on `POST /api/letter-runs`. `errors` lists them |
 | 400 | `UNKNOWN_LETTER_TYPE` | `POST /api/letter-runs` with a type that has no lock row |
-| 400 | `BAD_REQUEST` | Missing header, an unreadable body (such as a bad date format), a non-numeric ID, or an unsupported `Api-Version` |
-| 404 | `NOT_FOUND` | Unknown run, letter type or document (`EntityNotFoundException`), or an external document that isn't visible to external users |
-| 409 | `RUN_IN_PROGRESS` | The type has queue rows still flagged N, from any source (this is also what stops a double submit) |
+| 400 | `BAD_REQUEST` | Missing header or required parameter (such as `planId` on `GET /api/letter-runs` or `eligible-count`), an unreadable body (such as a bad date format), a non-numeric ID, or an unsupported `Api-Version` |
+| 404 | `NOT_FOUND` | Unknown run, letter type, plan type or document (`EntityNotFoundException`), or an external document that isn't visible to external users |
+| 409 | `RUN_IN_PROGRESS` | This plan already has a run of this letter type that isn't complete (`completed_at` null after recalculating). This is also what stops a double submit. Runs of the same type in other plans don't block |
 | 409 | `NOT_COMPLETE` | Release of a run whose `completed_at` isn't set |
 | 409 | `ALREADY_RELEASED` | Release of a run that is already STAFF_AND_EXTERNAL |
 | 422 | `NO_ELIGIBLE_APPLICATIONS` | Nothing to generate; nothing is written |
@@ -220,11 +239,13 @@ Start both apps (see above), with a fresh backend. Switch users with **POC only:
 The simulated generator makes 5 letters every 10s, and the page polls every 15s while anything is generating.
 
 **1. Generate as admin**
-1. As `admin`, pick **Letter type F**: "No new applications are awaiting this letter type." appears and Generate stays disabled.
-2. Pick **Letter type A** (18 new applications) and any claim submitted date, then click **Generate**.
-3. The dialog shows the type, date, 18 applications and "Initial visibility: Staff only". Click **Generate**.
-4. A snackbar confirms. The run appears as *0 / 18 letters · Queued · Staff only*, and moves to *In progress* once the first letters exist.
-5. Letter type A now shows "A run for this letter type is still generating. Wait for it to complete."
+1. As `admin`, in **Select an action** choose **[Plan type 1]**, **[Plan 1A]** and **Generate decision letter**. The Generate card and "Letter generation runs for [Plan 1A]" appear.
+2. Pick **Letter type F**: "No new applications are awaiting this letter type." appears and Generate stays disabled.
+3. Pick **Letter type A** (18 new applications in this plan), then click **Generate**.
+4. The popup shows the type, 18 applications and "Initial visibility: Staff only". Its Generate button stays disabled until you pick a **Deadline for claim submission** and type a **Comment**. Click **Generate**.
+5. A snackbar confirms, and the comment is logged by the backend (`Comment for letter run …`). The run appears as *0 / 18 letters · Queued · Staff only*, and moves to *In progress* once the first letters exist.
+6. Letter type A now shows "A run for this letter type is still generating. Wait for it to complete."
+7. Switch the plan to **[Plan 1B]**: the letter type clears, the table shows that plan's (empty) runs, and Letter type B (15 applications) can be generated even while Plan 1A's runs are going.
 
 **2. Watch progress.** Within about 45s the row climbs to *18 / 18 · Complete*, and polling stops. "Enable for external users" was disabled with "Available when generation completes" until then.
 
@@ -233,7 +254,7 @@ The simulated generator makes 5 letters every 10s, and the page polls every 15s 
 2. Only `DOC-EXISTING-6` (LETTER_I) is listed. It's an existing letter with no run, so it stays visible. The new LETTER_A letter is hidden.
 
 **4. Release as staff**
-1. Switch to `staff`. The Generate card is replaced by "Generating letters is restricted to the Admin role."
+1. Switch to `staff` and choose [Plan type 1], [Plan 1A] and Generate decision letter. The Generate card is replaced by "Generating letters is restricted to the Admin role."
 2. Click **Enable for external users** on the LETTER_A run and confirm.
 3. The chip becomes *Staff + External*, with "Enabled <date> by staff".
 
@@ -252,15 +273,15 @@ curl -s -u staff:staff -X DELETE http://localhost:8080/api/staff/documents/<docI
 ```
 
 Then:
-1. As `admin`, Letter type A now shows 1 new application. Generate it.
+1. As `admin`, in [Plan 1A], Letter type A now shows 1 new application. Generate it.
 2. When the run completes, `external` sees APP-0003's regenerated letter hidden again, until staff enable run 2.
 3. Other applications' LETTER_A letters (for example APP-0004) stay visible throughout.
 
 **7. The stuck run**
-1. As `admin`, generate **Letter type E** (5 applications). APP-0043 is configured to always fail.
+1. As `admin`, choose [Plan type 2] and [Plan 2A], and generate **Letter type E** (5 applications). APP-0043 is configured to always fail.
 2. The run stops at *4 / 5*. Two minutes after it was requested (the dev profile's `letters.needs-attention-after`), it shows **Needs attention**, and Enable says "Generation stalled; contact support".
 3. Within a minute after that, the backend log shows `WARN … ALERT letter run <id> needs attention …`, repeated on every check while the run stays stuck.
-4. A new LETTER_E run is refused (`RUN_IN_PROGRESS`), and so is a release (`NOT_COMPLETE`).
+4. A new LETTER_E run in Plan 2A is refused (`RUN_IN_PROGRESS`), and so is a release (`NOT_COMPLETE`).
 5. `GET /api/letter-runs/<id>/pending` (as `admin` or `staff`) lists `APP-0043`, the application with no letter.
 
 **8. Revoke** (no endpoint or UI): see "Revoking a mistaken release" below.
@@ -280,15 +301,22 @@ Entities and `JpaRepository` interfaces are used throughout, matching the Places
 
 ### Generate: one transaction
 
+`POST /api/letter-runs` takes `{planId, letterType, claimDeadlineDate, comment}`. `comment` is required: not blank, at most 500 characters.
+
 `LetterRunService.generateLetters` runs the steps in this order:
-1. Lock the type's `letter_type_lock` row (`@Lock(PESSIMISTIC_WRITE)`, which Hibernate renders as `SELECT … FOR UPDATE`). No row means the type is unknown: 400 `UNKNOWN_LETTER_TYPE`.
-2. Check for pending queue rows (409 `RUN_IN_PROGRESS`).
-3. Save the run.
-4. Insert the run items (`INSERT … SELECT`, using the same eligibility SQL as the count). Zero items means 422 and a rollback.
+1. Lock the type's `letter_type_lock` row (`@Lock(PESSIMISTIC_WRITE)`, which Hibernate renders as `SELECT … FOR UPDATE`). No row means the type is unknown: 400 `UNKNOWN_LETTER_TYPE`. The lock is per type across all plans; it's held only for the length of this transaction.
+2. Check the plan's runs of this type with `completed_at` null. Each is recalculated first (which sets `completed_at` if every letter has arrived); any that is still not complete means 409 `RUN_IN_PROGRESS`.
+3. Save the run with its `plan_id`.
+4. Insert the run items (`INSERT … SELECT`, using the same eligibility SQL as the count, joined to the application stub on `plan_id`). Zero items means 422 and a rollback.
 5. Set `total_requested`.
 6. Insert the queue rows from the items, building the key in the insert.
+7. Pass the comment to `LetterRunCommentStore.store(runId, comment, author)`. Where comments live isn't decided, so the POC's `LoggingLetterRunCommentStore` only logs it; swap the bean when it is. The comment isn't on `letter_run` and isn't returned.
 
-There's no idempotency key. The lock plus the pending check make a double click or a retry return 409 instead of creating a second run, and the UI disables the confirm button while the request is in flight. `GenerateConcurrencyTest` fails if the `@Lock` is removed.
+The eligibility rule still skips any application with a pending queue row for the type, so a pending row from another source no longer blocks the whole run, it just leaves that application out.
+
+There's no idempotency key. The lock plus the unfinished-run check make a double click or a retry return 409 instead of creating a second run, and the UI disables the confirm button while the request is in flight. `GenerateConcurrencyTest` fails if the `@Lock` is removed; it also checks that the same type in two plans at once gives one run per plan.
+
+`GET /api/letter-runs` and `GET /api/letter-types/{code}/eligible-count` both require `planId`. `GET /api/plan-types` and `GET /api/plan-types/{id}/plans` (ADMIN, STAFF) are stand-ins for the existing system's plan data.
 
 Things to check on the real database:
 - **Locking syntax.** Hibernate's dialect handles it, including `WITH (UPDLOCK, ROWLOCK)` on SQL Server.
@@ -359,7 +387,7 @@ The POC does not check that an external user may access a given application. The
 
 Statuses are calculated on read, so the job isn't needed for them to be correct.
 
-A NEEDS_ATTENTION run can't be released, and it still blocks new runs of its type, because its queue rows are still N. Once the last letters arrive it becomes COMPLETE, whatever its age.
+A NEEDS_ATTENTION run can't be released, and it still blocks new runs of its type in its plan, because it isn't complete. Once the last letters arrive it becomes COMPLETE, whatever its age.
 
 ### Single-pod scheduling
 
@@ -413,7 +441,7 @@ Record who released and who revoked in the change ticket, since the run no longe
 | Lean schema: three new tables; only facts that can't be calculated are stored | Fewer values to keep in step with tables we don't control | Stored generated count, stored status, per-item status, audit table |
 | Store `total_requested` and `completed_at` on the run | Total is fixed at Generate; completed_at freezes a finished run's display | Recounting everything on every read |
 | Status calculated: Queued, In progress, Complete, Needs attention | Always correct; no sync job needed for correctness | A stored status column |
-| Per-type lock + pending check | Prevents duplicates without extra state | An idempotency key |
+| Per-type lock + unfinished-run check | Prevents duplicates without extra state | An idempotency key |
 | Revoke as a manual procedure | Rare; no extra endpoint or UI | A revoke endpoint or button |
 | Needs attention = not complete N hours after the request; release blocked | The generator retries forever; never expose unreviewed letters | Partial release; deleting shared queue rows; stored last-progress time |
 | Release and completion as guarded UPDATEs | Concurrent requests can't both succeed or overwrite `completed_at`; no row locks needed | Read-check-set with a row lock; optimistic `@Version` |
@@ -432,3 +460,8 @@ Record who released and who revoked in the change ticket, since the run no longe
 | springdoc-openapi, dev profile only | Swagger UI for exploring the API; nothing exposed in other profiles | Hand-written OpenAPI YAML; docs on in every profile |
 | M3 theme generated from the mockup's colours | Matches the brand while staying on theme tokens | Hard-coded hex values in components |
 | `UkNativeDateAdapter` (day-first parsing) | Mockup uses dd/mm/yyyy; the native adapter parses US-style | Adding a date library to the POC |
+| Runs are scoped to a plan (`plan_id` on `letter_run`) | Admins generate per plan; the table shows one plan's runs | Global runs per letter type |
+| Type lock stays per letter type, across plans | Plans are dynamic, so there's no fixed row per plan to lock; the lock is held for milliseconds | A lock row per plan and type |
+| 409 = unfinished run for the same plan and type | Matches what the user sees; doesn't block other plans | Any pending queue row for the type |
+| Comment required, stored behind an interface | Location not decided; keeps the rest of the code stable | A column on `letter_run` |
+| `claim_submitted_date` renamed to `claim_deadline_date` | Matches the field's meaning and the UI label | Keeping the old name |
