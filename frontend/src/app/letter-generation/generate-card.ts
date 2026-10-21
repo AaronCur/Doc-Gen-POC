@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import {
   AbstractControl,
@@ -10,29 +10,27 @@ import {
 } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
-import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 
 import { LettersApi } from '../api/letters-api';
 import { LetterRun, LetterType } from '../api/models';
 import { problemMessage, toProblem } from '../api/problem';
-import { toIsoDate } from './dates';
 import { GenerateDialog, GenerateDialogData, GenerateDialogResult } from './generate-dialog';
 
-/** ADMIN only. Picks a letter type and claim submitted date and starts a run. */
+/**
+ * ADMIN only. Picks a letter type for the selected plan and opens the Generate popup, which asks
+ * for the deadline for claim submission and the comment.
+ */
 @Component({
   selector: 'app-generate-card',
   imports: [
     ReactiveFormsModule,
     MatButtonModule,
     MatCardModule,
-    MatDatepickerModule,
     MatFormFieldModule,
-    MatInputModule,
     MatSelectModule,
   ],
   templateUrl: './generate-card.html',
@@ -43,9 +41,12 @@ export class GenerateCard {
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
 
+  /** The plan chosen in "Select an action". Changing it clears the chosen letter type. */
+  readonly planId = input.required<string>();
   readonly letterTypes = input.required<LetterType[]>();
   /**
-   * Letter types with a QUEUED, IN_PROGRESS or NEEDS_ATTENTION run, from the runs the page has loaded.
+   * Letter types with a QUEUED, IN_PROGRESS or NEEDS_ATTENTION run in this plan, from the runs
+   * the page has loaded.
    * case-service also rejects a second run (409 RUN_IN_PROGRESS), so this is guidance only.
    */
   readonly activeLetterTypes = input<ReadonlySet<string>>(new Set());
@@ -67,7 +68,6 @@ export class GenerateCard {
       Validators.required,
       (control) => this.letterTypeAvailable(control),
     ]),
-    claimSubmittedDate: new FormControl<Date | null>(null, Validators.required),
   });
 
   private readonly formValue = toSignal(this.form.valueChanges, { initialValue: this.form.value });
@@ -78,11 +78,10 @@ export class GenerateCard {
   });
 
   protected readonly canGenerate = computed(() => {
-    const { letterType, claimSubmittedDate } = this.formValue();
+    const { letterType } = this.formValue();
     const count = this.eligibleCount();
     return (
       !!letterType &&
-      !!claimSubmittedDate &&
       count !== null &&
       count > 0 &&
       !this.activeLetterTypes().has(letterType)
@@ -92,6 +91,12 @@ export class GenerateCard {
   constructor() {
     this.form.controls.letterType.valueChanges.subscribe((code) => this.loadEligibleCount(code));
 
+    // A different plan: start again with no letter type chosen.
+    effect(() => {
+      this.planId();
+      untracked(() => this.form.controls.letterType.setValue(null));
+    });
+
     // Re-check the letter type when the set of active runs changes (polling).
     effect(() => {
       this.activeLetterTypes();
@@ -100,14 +105,14 @@ export class GenerateCard {
   }
 
   protected openConfirmation(): void {
-    const { letterType, claimSubmittedDate } = this.form.getRawValue();
-    if (!this.canGenerate() || !letterType || !claimSubmittedDate) {
+    const { letterType } = this.form.getRawValue();
+    if (!this.canGenerate() || !letterType) {
       return;
     }
     const data: GenerateDialogData = {
+      planId: this.planId(),
       letterType,
       letterTypeName: this.letterTypes().find((t) => t.code === letterType)?.name ?? letterType,
-      claimSubmittedDate: toIsoDate(claimSubmittedDate),
       eligibleCount: this.eligibleCount() ?? 0,
     };
     this.dialog
@@ -141,7 +146,7 @@ export class GenerateCard {
     if (!code) {
       return;
     }
-    this.api.eligibleCount(code).subscribe({
+    this.api.eligibleCount(code, this.planId()).subscribe({
       next: (result) => {
         if (this.form.controls.letterType.value === code) {
           this.countLoading.set(false);

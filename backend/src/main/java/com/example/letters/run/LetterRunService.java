@@ -25,38 +25,47 @@ public class LetterRunService {
     private final LetterTypeLockRepository letterTypeLockRepository;
     private final LetterRequestQueueRepository letterRequestQueueRepository;
     private final LetterRunStatusService letterRunStatusService;
+    private final LetterRunCommentStore letterRunCommentStore;
     private final Clock clock;
 
     public LetterRunService(LetterRunRepository letterRunRepository, LetterRunItemRepository letterRunItemRepository,
             LetterTypeRepository letterTypeRepository, LetterTypeLockRepository letterTypeLockRepository,
             LetterRequestQueueRepository letterRequestQueueRepository,
-            LetterRunStatusService letterRunStatusService, Clock clock) {
+            LetterRunStatusService letterRunStatusService, LetterRunCommentStore letterRunCommentStore,
+            Clock clock) {
         this.letterRunRepository = letterRunRepository;
         this.letterRunItemRepository = letterRunItemRepository;
         this.letterTypeRepository = letterTypeRepository;
         this.letterTypeLockRepository = letterTypeLockRepository;
         this.letterRequestQueueRepository = letterRequestQueueRepository;
         this.letterRunStatusService = letterRunStatusService;
+        this.letterRunCommentStore = letterRunCommentStore;
         this.clock = clock;
     }
 
     /**
-     * Creates a run and queues one letter request per eligible application, all in one local
-     * transaction. Any exception thrown here rolls everything back. Duplicates are prevented by the
-     * per-type lock plus the pending check, so no idempotency key is needed.
+     * Creates a run for one plan and queues one letter request per eligible application in that
+     * plan, all in one local transaction. Any exception thrown here rolls everything back.
+     * Duplicates are prevented by the per-type lock plus the unfinished-run check, so no
+     * idempotency key is needed.
      */
     @Transactional
     public LetterRunResponse generateLetters(LetterRunRequest request, String actor) {
+        String planId = request.planId();
         String type = request.letterType();
 
-        // 1. Serialise generation per letter type. Held until commit or rollback.
+        // 1. Serialise generation per letter type, across all plans. Held until commit or rollback.
         letterTypeLockRepository.findWithLockByLetterType(type)
                 .orElseThrow(() -> new BusinessRuleException(HttpStatus.BAD_REQUEST, "UNKNOWN_LETTER_TYPE",
                         "Unknown letter type: " + type));
 
-        // 2. Any unprocessed queue row for this type means a previous run is still generating
-        //    (or a second click arrived while the first was being processed).
-        if (letterRequestQueueRepository.countPending(type) > 0) {
+        // 2. This plan already has an unfinished run of this type (or a second click arrived while
+        //    the first was being processed). Each run's status is recalculated first, so a run whose
+        //    last letters have just arrived counts as finished. Other plans are not blocked.
+        boolean unfinishedRun = letterRunRepository.findAllByPlanIdAndLetterType_CodeAndCompletedAtIsNull(planId, type)
+                .stream()
+                .anyMatch(run -> letterRunStatusService.calculate(run).status() != RunStatus.COMPLETE);
+        if (unfinishedRun) {
             throw new BusinessRuleException(HttpStatus.CONFLICT, "RUN_IN_PROGRESS",
                     "A run for this letter type is still generating.");
         }
@@ -66,10 +75,10 @@ public class LetterRunService {
 
         // 3. The run starts visible to staff only.
         LetterRun run = letterRunRepository.saveAndFlush(
-                new LetterRun(letterType, request.claimSubmittedDate(), actor, clock.instant()));
+                new LetterRun(planId, letterType, request.claimDeadlineDate(), actor, clock.instant()));
 
-        // 4. Record membership once, from the eligibility rule.
-        int total = letterRunItemRepository.insertForEligibleApplications(run.getId(), type);
+        // 4. Record membership once, from the eligibility rule, for this plan only.
+        int total = letterRunItemRepository.insertForEligibleApplications(run.getId(), type, planId);
         if (total == 0) {
             throw new BusinessRuleException(HttpStatus.UNPROCESSABLE_CONTENT, "NO_ELIGIBLE_APPLICATIONS",
                     "No new applications are awaiting this letter type.");
@@ -82,13 +91,17 @@ public class LetterRunService {
         // 6. Populate the shared queue from the run items.
         letterRequestQueueRepository.insertPendingForRun(run.getId());
 
+        // 7. The mandatory comment goes to its own store; it isn't kept on the run.
+        letterRunCommentStore.store(run.getId(), request.comment(), actor);
+
         return mapToResponse(run);
     }
 
-    /** Newest first, with each run's status calculated. */
+    /** One plan's runs, newest first, with each run's status calculated. */
     @Transactional
-    public LetterRunPageResponse getLetterRuns(int page, int size) {
-        Page<LetterRun> runs = letterRunRepository.findAllByOrderByRequestedAtDescIdDesc(PageRequest.of(page, size));
+    public LetterRunPageResponse getLetterRuns(String planId, int page, int size) {
+        Page<LetterRun> runs = letterRunRepository.findAllByPlanIdOrderByRequestedAtDescIdDesc(planId,
+                PageRequest.of(page, size));
         return new LetterRunPageResponse(runs.map(this::mapToResponse).getContent(), runs.getTotalElements());
     }
 
@@ -136,9 +149,10 @@ public class LetterRunService {
         LetterRunStatusService.RunProgress progress = letterRunStatusService.calculate(run);
         return new LetterRunResponse(
                 run.getId(),
+                run.getPlanId(),
                 run.getLetterType().getCode(),
                 run.getLetterType().getName(),
-                run.getClaimSubmittedDate(),
+                run.getClaimDeadlineDate(),
                 progress.status(),
                 run.getVisibility(),
                 run.getTotalRequested(),

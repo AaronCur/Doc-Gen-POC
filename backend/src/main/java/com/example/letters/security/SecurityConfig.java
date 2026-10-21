@@ -37,6 +37,10 @@ public class SecurityConfig {
                         // from Swagger UI still need credentials.
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
 
+                        // POC stand-ins for the existing admin screen's plan lists
+                        .requestMatchers(HttpMethod.GET, "/api/plan-types", "/api/plan-types/*/plans")
+                        .hasAnyRole(ADMIN, STAFF)
+
                         .requestMatchers(HttpMethod.GET, "/api/letter-types").hasAnyRole(ADMIN, STAFF)
                         .requestMatchers(HttpMethod.GET, "/api/letter-types/*/eligible-count").hasRole(ADMIN)
 

@@ -39,18 +39,19 @@ class LetterTypeServiceTest {
     @Test
     void returnsTheEligibleCountForAKnownType() {
         when(letterTypeRepository.findById("LETTER_A")).thenReturn(Optional.of(new LetterType("LETTER_A", "Letter type A")));
-        when(eligibilityRepository.countEligible("LETTER_A")).thenReturn(18L);
+        when(eligibilityRepository.countEligible("LETTER_A", "PLAN-1A")).thenReturn(18L);
 
-        assertThat(letterTypeService.getEligibleCount("LETTER_A")).isEqualTo(new EligibleCountResponse("LETTER_A", 18));
+        assertThat(letterTypeService.getEligibleCount("LETTER_A", "PLAN-1A"))
+                .isEqualTo(new EligibleCountResponse("LETTER_A", "PLAN-1A", 18));
     }
 
     @Test
     void unknownTypeIsNotFoundAndNothingIsCounted() {
         when(letterTypeRepository.findById("LETTER_Z")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> letterTypeService.getEligibleCount("LETTER_Z"))
+        assertThatThrownBy(() -> letterTypeService.getEligibleCount("LETTER_Z", "PLAN-1A"))
                 .isInstanceOf(EntityNotFoundException.class)
                 .hasMessage("Letter type not found with code: LETTER_Z");
-        verify(eligibilityRepository, never()).countEligible(anyString());
+        verify(eligibilityRepository, never()).countEligible(anyString(), anyString());
     }
 }

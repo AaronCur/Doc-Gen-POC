@@ -38,13 +38,13 @@ class ReleaseTest extends IntegrationTest {
     void releaseChangesOnlyTheVisibilityAndReleaseColumns() {
         long runId = completedRun();
         var before = jdbc.queryForMap(
-                "SELECT letter_type, claim_submitted_date, total_requested, requested_by, requested_at, completed_at "
+                "SELECT plan_id, letter_type, claim_deadline_date, total_requested, requested_by, requested_at, completed_at "
                         + "FROM letter_run WHERE run_id = ?", runId);
 
         service.releaseLetterRun(runId, "staff");
 
         assertThat(jdbc.queryForMap(
-                "SELECT letter_type, claim_submitted_date, total_requested, requested_by, requested_at, completed_at "
+                "SELECT plan_id, letter_type, claim_deadline_date, total_requested, requested_by, requested_at, completed_at "
                         + "FROM letter_run WHERE run_id = ?", runId)).isEqualTo(before);
     }
 

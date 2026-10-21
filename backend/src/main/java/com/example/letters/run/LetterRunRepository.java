@@ -16,9 +16,16 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface LetterRunRepository extends JpaRepository<LetterRun, Long> {
 
-    /** Newest first. The letter type is fetched in the same query, so a page needs no extra selects. */
+    /**
+     * One plan's runs, newest first. The letter type is fetched in the same query, so a page needs
+     * no extra selects.
+     */
     @EntityGraph(attributePaths = "letterType")
-    Page<LetterRun> findAllByOrderByRequestedAtDescIdDesc(Pageable pageable);
+    Page<LetterRun> findAllByPlanIdOrderByRequestedAtDescIdDesc(String planId, Pageable pageable);
+
+    /** The plan's unfinished runs of a letter type, for the "run in progress" check at Generate. */
+    @EntityGraph(attributePaths = "letterType")
+    List<LetterRun> findAllByPlanIdAndLetterType_CodeAndCompletedAtIsNull(String planId, String letterType);
 
     @EntityGraph(attributePaths = "letterType")
     Optional<LetterRun> findWithLetterTypeById(Long id);

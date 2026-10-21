@@ -28,7 +28,7 @@ const MESSAGES: Record<string, string> = {
   NO_ELIGIBLE_APPLICATIONS: 'No new applications are awaiting this letter type.',
   NOT_COMPLETE: 'This run can be enabled when generation completes.',
   ALREADY_RELEASED: 'This run is already visible to external users.',
-  VALIDATION_FAILED: 'Please check the letter type and claim submitted date.',
+  VALIDATION_FAILED: 'Please check the letter type, deadline for claim submission and comment.',
 };
 
 export function problemMessage(problem: ApiProblem): string {

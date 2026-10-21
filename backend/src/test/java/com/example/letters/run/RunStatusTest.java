@@ -124,11 +124,26 @@ class RunStatusTest extends IntegrationTest {
         long runId = runFor("APP-1", "APP-2");
         data.document("DOC-1", "APP-1", TYPE);
 
-        assertThat(service.getLetterRuns(0, 20).items()).singleElement().satisfies(run -> {
+        assertThat(service.getLetterRuns(PLAN, 0, 20).items()).singleElement().satisfies(run -> {
             assertThat(run.runId()).isEqualTo(runId);
             assertThat(run.status()).isEqualTo(RunStatus.IN_PROGRESS);
             assertThat(run.generatedCount()).isEqualTo(1);
         });
+    }
+
+    @Test
+    void theListReturnsOnlyTheRequestedPlansRuns() {
+        data.eligibleApplicationInPlan("PLAN-A", "APP-1", TYPE);
+        data.eligibleApplicationInPlan("PLAN-B", "APP-2", TYPE);
+        long runA = generateRun("PLAN-A", TYPE);
+        long runB = generateRun("PLAN-B", TYPE);
+
+        assertThat(service.getLetterRuns("PLAN-A", 0, 20).items()).extracting(LetterRunResponse::runId)
+                .containsExactly(runA);
+        assertThat(service.getLetterRuns("PLAN-B", 0, 20).items()).extracting(LetterRunResponse::runId)
+                .containsExactly(runB);
+        assertThat(service.getLetterRuns("PLAN-B", 0, 20).total()).isEqualTo(1);
+        assertThat(service.getLetterRuns("PLAN-C", 0, 20).items()).isEmpty();
     }
 
     // --- Pending applications ---

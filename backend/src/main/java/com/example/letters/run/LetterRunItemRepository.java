@@ -14,8 +14,8 @@ import com.example.letters.eligibility.ApplicationLetterEligibilityRepository;
 public interface LetterRunItemRepository extends JpaRepository<LetterRunItem, LetterRunItemId> {
 
     /**
-     * Records the run's membership in one statement: one item per application eligible right
-     * now, using the same SQL as the eligible count. Returns the number of items inserted.
+     * Records the run's membership in one statement: one item per application in the plan that is
+     * eligible right now, using the same SQL as the eligible count. Returns the number of items inserted.
      * Parameters in the SELECT list are CAST so every database can infer their types.
      */
     @Modifying
@@ -26,7 +26,8 @@ public interface LetterRunItemRepository extends JpaRepository<LetterRunItem, Le
             """ + ApplicationLetterEligibilityRepository.ELIGIBLE_APP_IDS + """
             ) eligible
             """, nativeQuery = true)
-    int insertForEligibleApplications(@Param("runId") Long runId, @Param("letterType") String letterType);
+    int insertForEligibleApplications(@Param("runId") Long runId, @Param("letterType") String letterType,
+            @Param("planId") String planId);
 
     /**
      * Items that have a document of their type. Unambiguous, because the eligibility rule never

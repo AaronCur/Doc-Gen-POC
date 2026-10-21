@@ -3,7 +3,7 @@ import { CanActivateFn, Router, Routes } from '@angular/router';
 
 import { DevUser } from './auth/dev-user';
 import { ExternalViewPage } from './external-view/external-view-page';
-import { LetterGenerationPage } from './letter-generation/letter-generation-page';
+import { AdminPage } from './admin/admin-page';
 
 // These guards only route people to the page that fits their role. Authorisation is enforced
 // by case-service on every request.
@@ -14,7 +14,7 @@ const externalOnly: CanActivateFn = () =>
   inject(DevUser).isExternal() || inject(Router).parseUrl('/');
 
 export const routes: Routes = [
-  { path: '', component: LetterGenerationPage, canActivate: [staffOnly], title: 'Letter generation' },
+  { path: '', component: AdminPage, canActivate: [staffOnly], title: 'Admin' },
   { path: 'external', component: ExternalViewPage, canActivate: [externalOnly], title: 'External view' },
   { path: '**', redirectTo: '' },
 ];

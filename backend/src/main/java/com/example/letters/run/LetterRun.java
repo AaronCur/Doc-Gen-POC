@@ -36,12 +36,17 @@ public class LetterRun {
     @Column(name = "run_id")
     private Long id;
 
+    /** The plan the run belongs to. Plan type is derived from the plan, so it isn't stored. */
+    @Column(name = "plan_id", nullable = false)
+    private String planId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "letter_type", nullable = false)
     private LetterType letterType;
 
-    @Column(name = "claim_submitted_date", nullable = false)
-    private LocalDate claimSubmittedDate;
+    /** Deadline for claim submission, as entered by the admin. */
+    @Column(name = "claim_deadline_date", nullable = false)
+    private LocalDate claimDeadlineDate;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -68,9 +73,11 @@ public class LetterRun {
     private Instant releasedAt;
 
     /** A new run, visible to staff only. The total is set once the items are recorded. */
-    public LetterRun(LetterType letterType, LocalDate claimSubmittedDate, String requestedBy, Instant now) {
+    public LetterRun(String planId, LetterType letterType, LocalDate claimDeadlineDate, String requestedBy,
+            Instant now) {
+        this.planId = planId;
         this.letterType = letterType;
-        this.claimSubmittedDate = claimSubmittedDate;
+        this.claimDeadlineDate = claimDeadlineDate;
         this.visibility = RunVisibility.STAFF_ONLY;
         this.totalRequested = 0;
         this.requestedBy = requestedBy;

@@ -1,7 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideNativeDateAdapter } from '@angular/material/core';
 
 import { GenerateCard } from './generate-card';
 
@@ -13,12 +12,13 @@ describe('GenerateCard', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [GenerateCard],
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideNativeDateAdapter()],
+      providers: [provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
 
     fixture = TestBed.createComponent(GenerateCard);
     card = fixture.componentInstance;
     http = TestBed.inject(HttpTestingController);
+    fixture.componentRef.setInput('planId', 'PLAN-1A');
     fixture.componentRef.setInput('letterTypes', [
       { code: 'LETTER_A', name: 'Letter type A' },
       { code: 'LETTER_B', name: 'Letter type B' },
@@ -38,27 +38,35 @@ describe('GenerateCard', () => {
 
   async function selectType(code: string, eligibleCount: number) {
     card.form.controls.letterType.setValue(code);
-    http.expectOne(`/api/letter-types/${code}/eligible-count`).flush({ code, eligibleCount });
+    http.expectOne(`/api/letter-types/${code}/eligible-count?planId=PLAN-1A`).flush({ code, eligibleCount });
     await fixture.whenStable();
   }
 
-  async function setDate() {
-    card.form.controls.claimSubmittedDate.setValue(new Date(2026, 1, 1));
-    await fixture.whenStable();
-  }
-
-  it('is disabled until both letter type and date are chosen', async () => {
+  it('is disabled until a letter type with eligible applications is chosen', async () => {
     expect(generateButton().disabled).toBe(true);
 
     await selectType('LETTER_A', 5);
-    expect(generateButton().disabled).toBe(true);
-
-    await setDate();
     expect(generateButton().disabled).toBe(false);
   });
 
+  it('has only the letter type field', () => {
+    expect(fixture.nativeElement.querySelectorAll('mat-form-field').length).toBe(1);
+    expect(fixture.nativeElement.querySelector('input')).toBeNull();
+  });
+
+  it('clears the letter type when the plan changes, and counts against the new plan', async () => {
+    await selectType('LETTER_A', 5);
+
+    fixture.componentRef.setInput('planId', 'PLAN-1B');
+    await fixture.whenStable();
+    expect(card.form.controls.letterType.value).toBeNull();
+    expect(generateButton().disabled).toBe(true);
+
+    card.form.controls.letterType.setValue('LETTER_A');
+    http.expectOne('/api/letter-types/LETTER_A/eligible-count?planId=PLAN-1B').flush({ code: 'LETTER_A', eligibleCount: 2 });
+  });
+
   it('is disabled with an error when no applications are eligible', async () => {
-    await setDate();
     await selectType('LETTER_A', 0);
 
     expect(generateButton().disabled).toBe(true);
@@ -67,7 +75,6 @@ describe('GenerateCard', () => {
 
   it('is disabled with an error while the type has an active run', async () => {
     fixture.componentRef.setInput('activeLetterTypes', new Set(['LETTER_A']));
-    await setDate();
     await selectType('LETTER_A', 5);
 
     expect(generateButton().disabled).toBe(true);
@@ -76,7 +83,6 @@ describe('GenerateCard', () => {
 
   it('is re-enabled when the active run for the type finishes', async () => {
     fixture.componentRef.setInput('activeLetterTypes', new Set(['LETTER_A']));
-    await setDate();
     await selectType('LETTER_A', 5);
     expect(generateButton().disabled).toBe(true);
 
@@ -95,7 +101,6 @@ describe('GenerateCard', () => {
 
   it('an active run for another type does not block', async () => {
     fixture.componentRef.setInput('activeLetterTypes', new Set(['LETTER_B']));
-    await setDate();
     await selectType('LETTER_A', 5);
 
     expect(generateButton().disabled).toBe(false);
@@ -112,16 +117,15 @@ describe('GenerateCard', () => {
     await fixture.whenStable();
     expect(text()).toContain('Checking eligible applications');
 
-    http.expectOne('/api/letter-types/LETTER_A/eligible-count').flush({ code: 'LETTER_A', eligibleCount: 5 });
+    http.expectOne('/api/letter-types/LETTER_A/eligible-count?planId=PLAN-1A').flush({ code: 'LETTER_A', eligibleCount: 5 });
     await fixture.whenStable();
     expect(text()).not.toContain('Checking eligible applications');
   });
 
   it('explains a failed eligible count under the field and retries it', async () => {
-    await setDate();
     card.form.controls.letterType.setValue('LETTER_A');
     http
-      .expectOne('/api/letter-types/LETTER_A/eligible-count')
+      .expectOne('/api/letter-types/LETTER_A/eligible-count?planId=PLAN-1A')
       .flush(null, { status: 503, statusText: 'Service Unavailable' });
     await fixture.whenStable();
 
@@ -131,7 +135,7 @@ describe('GenerateCard', () => {
     );
 
     button('Retry check')!.click();
-    http.expectOne('/api/letter-types/LETTER_A/eligible-count').flush({ code: 'LETTER_A', eligibleCount: 5 });
+    http.expectOne('/api/letter-types/LETTER_A/eligible-count?planId=PLAN-1A').flush({ code: 'LETTER_A', eligibleCount: 5 });
     await fixture.whenStable();
 
     expect(fixture.nativeElement.querySelector('mat-error')).toBeNull();

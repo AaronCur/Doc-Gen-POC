@@ -6,9 +6,10 @@ import { RunsTable } from './runs-table';
 function run(overrides: Partial<LetterRun>): LetterRun {
   return {
     runId: 1,
+    planId: 'PLAN-1A',
     letterType: 'LETTER_A',
     letterTypeName: 'Letter type A',
-    claimSubmittedDate: '2026-02-01',
+    claimDeadlineDate: '2026-02-01',
     status: 'COMPLETE',
     visibility: 'STAFF_ONLY',
     totalCount: 10,

@@ -16,7 +16,7 @@ class GenerateTest extends IntegrationTest {
 
     private static final String TYPE = "LETTER_A";
     private static final LocalDate CLAIM_DATE = LocalDate.of(2026, 2, 1);
-    private static final LetterRunRequest REQUEST = new LetterRunRequest(TYPE, CLAIM_DATE);
+    private static final LetterRunRequest REQUEST = new LetterRunRequest(PLAN, TYPE, CLAIM_DATE, "Test run");
 
     @Autowired
     LetterRunService service;
@@ -32,7 +32,7 @@ class GenerateTest extends IntegrationTest {
 
         assertThat(run.letterType()).isEqualTo(TYPE);
         assertThat(run.letterTypeName()).isEqualTo("Letter type A");
-        assertThat(run.claimSubmittedDate()).isEqualTo(CLAIM_DATE);
+        assertThat(run.claimDeadlineDate()).isEqualTo(CLAIM_DATE);
         assertThat(run.status()).isEqualTo(RunStatus.QUEUED);
         assertThat(run.visibility()).isEqualTo(RunVisibility.STAFF_ONLY);
         assertThat(run.totalCount()).isEqualTo(2);
@@ -40,8 +40,12 @@ class GenerateTest extends IntegrationTest {
         assertThat(run.requestedBy()).isEqualTo("admin");
         assertThat(run.requestedAt()).isEqualTo(START);
 
-        assertThat(jdbc.queryForObject(
-                "SELECT total_requested FROM letter_run WHERE run_id = ?", Integer.class, run.runId())).isEqualTo(2);
+        assertThat(run.planId()).isEqualTo(PLAN);
+        assertThat(jdbc.queryForMap(
+                "SELECT plan_id, claim_deadline_date, total_requested FROM letter_run WHERE run_id = ?", run.runId()))
+                .containsEntry("PLAN_ID", PLAN)
+                .containsEntry("CLAIM_DEADLINE_DATE", java.sql.Date.valueOf(CLAIM_DATE))
+                .containsEntry("TOTAL_REQUESTED", 2);
         assertThat(jdbc.queryForList(
                 "SELECT app_id || ':' || letter_type FROM letter_run_item WHERE run_id = ? ORDER BY app_id",
                 String.class, run.runId()))
@@ -81,8 +85,48 @@ class GenerateTest extends IntegrationTest {
     }
 
     @Test
+    void theSameTypeInAnotherPlanIsNotBlocked() {
+        data.eligibleApplicationInPlan("PLAN-A", "APP-1", TYPE);
+        data.eligibleApplicationInPlan("PLAN-B", "APP-2", TYPE);
+        service.generateLetters(new LetterRunRequest("PLAN-A", TYPE, CLAIM_DATE, "Test run"), "admin");
+
+        LetterRunResponse planB = service.generateLetters(
+                new LetterRunRequest("PLAN-B", TYPE, CLAIM_DATE, "Test run"), "admin");
+
+        assertThat(planB.planId()).isEqualTo("PLAN-B");
+        assertThat(jdbc.queryForList(
+                "SELECT app_id FROM letter_run_item WHERE run_id = ?", String.class, planB.runId()))
+                .containsExactly("APP-2");
+        assertThat(count("SELECT COUNT(*) FROM letter_run")).isEqualTo(2);
+    }
+
+    @Test
+    void aCompletedRunDoesNotBlockTheNextOne() {
+        data.eligibleApplication("APP-1", TYPE);
+        long firstRun = service.generateLetters(REQUEST, "admin").runId();
+        produceLetters(firstRun);
+        data.eligibleApplication("APP-2", TYPE);
+
+        assertThat(service.generateLetters(REQUEST, "admin").totalCount()).isEqualTo(1);
+    }
+
+    @Test
+    void aRunWhoseLettersHaveAllArrivedDoesNotBlockEvenBeforeItIsMarkedComplete() {
+        // The documents exist but nothing has read the run or run the job, so completed_at is still
+        // null. Generate recalculates the run first, finds it complete, and goes ahead.
+        data.eligibleApplication("APP-1", TYPE);
+        long firstRun = service.generateLetters(REQUEST, "admin").runId();
+        simulateGeneratorProcessedEverything();
+        data.eligibleApplication("APP-2", TYPE);
+
+        assertThat(service.generateLetters(REQUEST, "admin").totalCount()).isEqualTo(1);
+        assertThat(count("SELECT COUNT(*) FROM letter_run WHERE run_id = ? AND completed_at IS NOT NULL", firstRun))
+                .isEqualTo(1);
+    }
+
+    @Test
     void aRepeatedClickIsRejectedRatherThanDuplicated() {
-        // Without an idempotency key, the pending check is what stops a double submit.
+        // Without an idempotency key, the unfinished-run check is what stops a double submit.
         data.eligibleApplication("APP-1", TYPE);
         service.generateLetters(REQUEST, "admin");
 
@@ -93,14 +137,17 @@ class GenerateTest extends IntegrationTest {
     }
 
     @Test
-    void aPendingRowFromAnotherSourceAlsoBlocksGenerate() {
-        // e.g. a datafix inserted a row for this type and the generator has not processed it yet
+    void aPendingQueueRowFromAnotherSourceNoLongerBlocksGenerateButItsApplicationIsSkipped() {
+        // e.g. a datafix queued APP-1 and the generator has not processed it yet. The 409 is now
+        // about runs, not queue rows; the eligibility rule still leaves APP-1 out.
         data.eligibleApplication("APP-1", TYPE);
-        data.queueRow("APP-9", TYPE, 'N');
+        data.eligibleApplication("APP-2", TYPE);
+        data.queueRow("APP-1", TYPE, 'N');
 
-        assertThatThrownBy(() -> service.generateLetters(REQUEST, "admin"))
-                .isInstanceOfSatisfying(BusinessRuleException.class,
-                        e -> assertThat(e.getCode()).isEqualTo("RUN_IN_PROGRESS"));
+        LetterRunResponse run = service.generateLetters(REQUEST, "admin");
+
+        assertThat(jdbc.queryForList("SELECT app_id FROM letter_run_item WHERE run_id = ?", String.class, run.runId()))
+                .containsExactly("APP-2");
     }
 
     @Test
@@ -130,7 +177,8 @@ class GenerateTest extends IntegrationTest {
 
     @Test
     void anUnknownLetterTypeIsRejectedWith400() {
-        assertThatThrownBy(() -> service.generateLetters(new LetterRunRequest("LETTER_Z", CLAIM_DATE), "admin"))
+        assertThatThrownBy(() -> service.generateLetters(
+                new LetterRunRequest(PLAN, "LETTER_Z", CLAIM_DATE, "Test run"), "admin"))
                 .isInstanceOfSatisfying(BusinessRuleException.class, e -> {
                     assertThat(e.getStatus().value()).isEqualTo(400);
                     assertThat(e.getCode()).isEqualTo("UNKNOWN_LETTER_TYPE");

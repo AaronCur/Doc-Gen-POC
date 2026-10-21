@@ -34,7 +34,7 @@ export class RunsTable {
   readonly pageChange = output<PageEvent>();
   readonly enable = output<LetterRun>();
 
-  protected readonly columns = ['letterType', 'claimSubmittedDate', 'requested', 'generation', 'visibility', 'action'];
+  protected readonly columns = ['letterType', 'claimDeadlineDate', 'requested', 'generation', 'visibility', 'action'];
 
   protected statusLabel(run: LetterRun): string {
     return STATUS_LABELS[run.status];

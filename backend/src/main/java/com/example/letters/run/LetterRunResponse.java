@@ -3,12 +3,13 @@ package com.example.letters.run;
 import java.time.Instant;
 import java.time.LocalDate;
 
-/** The run JSON from the API contract. */
+/** The run JSON from the API contract. The generate comment is deliberately not included. */
 public record LetterRunResponse(
         Long runId,
+        String planId,
         String letterType,
         String letterTypeName,
-        LocalDate claimSubmittedDate,
+        LocalDate claimDeadlineDate,
         RunStatus status,
         RunVisibility visibility,
         int totalCount,

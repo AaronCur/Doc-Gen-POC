@@ -2,6 +2,7 @@ package com.example.letters;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -33,19 +34,42 @@ class DevSeedTest {
     }
 
     @Test
-    void seedsSixtyApplications() {
-        assertThat(count("SELECT COUNT(*) FROM case_applications")).isEqualTo(60);
+    void seedsTwoPlanTypesAndThreePlans() {
+        assertThat(count("SELECT COUNT(*) FROM plan_type")).isEqualTo(2);
+        assertThat(count("SELECT COUNT(*) FROM plan WHERE plan_type_id = 'PT-1'")).isEqualTo(2);
+        assertThat(count("SELECT COUNT(*) FROM plan WHERE plan_type_id = 'PT-2'")).isEqualTo(1);
     }
 
     @Test
-    void eligibilityIsSpreadSoSomeTypesHaveNone() {
-        Map<String, Integer> expected = Map.of(
-                "LETTER_A", 18, "LETTER_B", 25, "LETTER_C", 30,
-                "LETTER_D", 20, "LETTER_E", 5, "LETTER_F", 0,
-                "LETTER_G", 0, "LETTER_H", 11, "LETTER_I", 0);
+    void seedsSixtyApplicationsSpreadOverThePlans() {
+        assertThat(count("SELECT COUNT(*) FROM case_applications")).isEqualTo(60);
+        assertThat(count("SELECT COUNT(*) FROM case_applications WHERE plan_id = 'PLAN-1A'")).isEqualTo(20);
+        assertThat(count("SELECT COUNT(*) FROM case_applications WHERE plan_id = 'PLAN-1B'")).isEqualTo(20);
+        assertThat(count("SELECT COUNT(*) FROM case_applications WHERE plan_id = 'PLAN-2A'")).isEqualTo(20);
+    }
 
-        expected.forEach((type, eligibleCount) ->
-                assertThat(eligibility.countEligible(type)).as(type).isEqualTo(eligibleCount.longValue()));
+    @Test
+    void eligibilityIsSpreadAcrossPlansSoSomeHaveNone() {
+        // letter type -> eligible count in PLAN-1A, PLAN-1B, PLAN-2A
+        Map<String, List<Integer>> expected = Map.of(
+                "LETTER_A", List.of(18, 0, 0),
+                "LETTER_B", List.of(10, 15, 0),
+                "LETTER_C", List.of(0, 10, 20),
+                "LETTER_D", List.of(6, 7, 7),
+                "LETTER_E", List.of(0, 0, 5),
+                "LETTER_F", List.of(0, 0, 0),
+                "LETTER_G", List.of(0, 0, 0),
+                "LETTER_H", List.of(0, 0, 11),
+                "LETTER_I", List.of(0, 0, 0));
+        List<String> plans = List.of("PLAN-1A", "PLAN-1B", "PLAN-2A");
+
+        expected.forEach((type, counts) -> {
+            for (int i = 0; i < plans.size(); i++) {
+                assertThat(eligibility.countEligible(type, plans.get(i)))
+                        .as(type + " in " + plans.get(i))
+                        .isEqualTo(counts.get(i).longValue());
+            }
+        });
     }
 
     @Test

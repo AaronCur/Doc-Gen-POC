@@ -30,6 +30,9 @@ public abstract class IntegrationTest {
 
     public static final Instant START = Instant.parse("2026-03-02T09:00:00Z");
 
+    /** The default plan used by {@link TestData#eligibleApplication} and {@link #generateRun(String)}. */
+    public static final String PLAN = TestData.PLAN;
+
     @TestConfiguration
     static class TestClockConfig {
         @Bean
@@ -64,10 +67,15 @@ public abstract class IntegrationTest {
     @Autowired
     private LetterRunCompletionJob completionJob;
 
-    /** Generates a run for every currently eligible application of the type; returns its ID. */
+    /** Generates a run in {@link #PLAN} for every eligible application of the type; returns its ID. */
     protected long generateRun(String letterType) {
-        return runService.generateLetters(new LetterRunRequest(letterType, LocalDate.of(2026, 2, 1)), "admin")
-                .runId();
+        return generateRun(PLAN, letterType);
+    }
+
+    /** Generates a run in the plan for every eligible application of the type; returns its ID. */
+    protected long generateRun(String planId, String letterType) {
+        return runService.generateLetters(
+                new LetterRunRequest(planId, letterType, LocalDate.of(2026, 2, 1), "Test run"), "admin").runId();
     }
 
     /**
